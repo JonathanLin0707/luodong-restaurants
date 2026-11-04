@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import App from './App.jsx'
 import * as api from './api.js'
 import * as mapsLoader from './mapsLoader.js'
+import taiwanDistricts from './data/taiwan-districts.json'
 
 vi.mock('./api.js')
 vi.mock('./mapsLoader.js')
@@ -829,5 +830,201 @@ describe('App - 地圖以所選地點為中心', () => {
     )
 
     resolveFetch(sampleRestaurants)
+  })
+})
+
+describe('App - 地點本地搜尋（不依賴 Google Places 自動完成）', () => {
+  const luodong = taiwanDistricts.find((d) => d.label === '宜蘭縣羅東鎮')
+  const xinyi = taiwanDistricts.find((d) => d.label === '台北市信義區')
+
+  it('輸入鄉鎮片段會列出符合的本地下拉選項，且不受 Google 元件狀態影響', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    const input = screen.getByLabelText('地點')
+    await user.type(input, '羅東')
+
+    const listbox = await screen.findByRole('listbox')
+    expect(within(listbox).getByRole('option', { name: '宜蘭縣羅東鎮' })).toBeInTheDocument()
+    expect(input).toHaveAttribute('aria-expanded', 'true')
+  })
+
+  it('輸入縣市片段（例如「信義」）也能篩出對應的鄉鎮市區', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    const input = screen.getByLabelText('地點')
+    await user.type(input, '信義')
+
+    const listbox = await screen.findByRole('listbox')
+    expect(within(listbox).getByRole('option', { name: '台北市信義區' })).toBeInTheDocument()
+  })
+
+  it('用滑鼠點選下拉選項會帶正確座標載入餐廳，並把選取結果顯示在輸入框', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+
+    const user = userEvent.setup()
+    render(<App />)
+
+    const input = screen.getByLabelText('地點')
+    await user.type(input, '羅東鎮')
+    const listbox = await screen.findByRole('listbox')
+    await user.click(within(listbox).getByRole('option', { name: '宜蘭縣羅東鎮' }))
+
+    expect(input).toHaveValue('宜蘭縣羅東鎮')
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(api.fetchRestaurants).toHaveBeenCalledWith(
+        expect.objectContaining({ lat: luodong.lat, lng: luodong.lng }),
+      ),
+    )
+    expect(await screen.findByText('羅東夜市小吃')).toBeInTheDocument()
+  })
+
+  it('用鍵盤（↓ 移動、Enter 選取）也能選到地點', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+
+    const user = userEvent.setup()
+    render(<App />)
+
+    const input = screen.getByLabelText('地點')
+    await user.type(input, '信義')
+    const listbox = await screen.findByRole('listbox')
+
+    const options = within(listbox).getAllByRole('option')
+    const targetIndex = options.findIndex((option) => option.textContent === xinyi.label)
+    expect(targetIndex).toBeGreaterThanOrEqual(0)
+    // 開啟下拉時預設 highlight 第一筆（index 0），往下移動到目標選項再送出。
+    for (let i = 0; i < targetIndex; i++) {
+      await user.keyboard('{ArrowDown}')
+    }
+    await user.keyboard('{Enter}')
+
+    expect(input).toHaveValue(xinyi.label)
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    await waitFor(() =>
+      expect(api.fetchRestaurants).toHaveBeenCalledWith(
+        expect.objectContaining({ lat: xinyi.lat, lng: xinyi.lng }),
+      ),
+    )
+  })
+
+  it('按 Esc 會關閉下拉但保留目前輸入的文字', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    const input = screen.getByLabelText('地點')
+    await user.type(input, '羅東')
+    await screen.findByRole('listbox')
+
+    await user.keyboard('{Escape}')
+
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument()
+    expect(input).toHaveValue('羅東')
+  })
+
+  it('Google 自動完成載入失敗（例如配額用盡）時，本地搜尋仍可正常選地點並載入餐廳清單', async () => {
+    mapsLoader.loadGoogleMaps.mockRejectedValue(
+      new Error('Quota exceeded for quota metric AutocompletePlacesRequest'),
+    )
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+
+    const user = userEvent.setup()
+    render(<App />)
+
+    const input = screen.getByLabelText('地點')
+    await user.type(input, '羅東鎮')
+    const listbox = await screen.findByRole('listbox')
+    await user.click(within(listbox).getByRole('option', { name: '宜蘭縣羅東鎮' }))
+
+    expect(await screen.findByText('羅東夜市小吃')).toBeInTheDocument()
+    expect(screen.getByText(`附近餐廳推薦：${luodong.label}`)).toBeInTheDocument()
+  })
+})
+
+describe('App - 地點本地搜尋（縣市＋鄉鎮連寫、全形臺、空白皆能篩出）', () => {
+  const xitun = taiwanDistricts.find((d) => d.label === '台中市西屯區')
+  const luodong = taiwanDistricts.find((d) => d.label === '宜蘭縣羅東鎮')
+  const lingya = taiwanDistricts.find((d) => d.label === '高雄市苓雅區')
+  const xinyi = taiwanDistricts.find((d) => d.label === '台北市信義區')
+  const shilin = taiwanDistricts.find((d) => d.label === '台北市士林區')
+  const qigu = taiwanDistricts.find((d) => d.label === '台南市七股區')
+
+  it.each([
+    ['台中西屯', xitun],
+    ['臺中西屯', xitun],
+    ['台中 西屯', xitun],
+    ['宜蘭羅東', luodong],
+    ['高雄苓雅', lingya],
+    ['臺中市西屯', xitun],
+    ['台中市西屯', xitun],
+    ['臺北市信義', xinyi],
+  ])('輸入「%s」會篩出「%s」', async (query, expected) => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    const input = screen.getByLabelText('地點')
+    await user.type(input, query)
+
+    const listbox = await screen.findByRole('listbox')
+    expect(within(listbox).getByRole('option', { name: expected.label })).toBeInTheDocument()
+  })
+
+  it('只輸入全形「臺北市」「臺南市」也能篩出該縣市下的鄉鎮市區（官方寫法常見）', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    const input = screen.getByLabelText('地點')
+
+    await user.type(input, '臺北市')
+    let listbox = await screen.findByRole('listbox')
+    expect(within(listbox).getByRole('option', { name: shilin.label })).toBeInTheDocument()
+
+    await user.clear(input)
+    await user.type(input, '臺南市')
+    listbox = await screen.findByRole('listbox')
+    expect(within(listbox).getByRole('option', { name: qigu.label })).toBeInTheDocument()
+  })
+
+  it('「台中市西屯」與「臺中市西屯」（僅差臺/台異體字）篩出結果一致', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    const input = screen.getByLabelText('地點')
+
+    await user.type(input, '台中市西屯')
+    const simplifiedListbox = await screen.findByRole('listbox')
+    expect(within(simplifiedListbox).getByRole('option', { name: xitun.label })).toBeInTheDocument()
+
+    await user.clear(input)
+    await user.type(input, '臺中市西屯')
+    const traditionalListbox = await screen.findByRole('listbox')
+    expect(
+      within(traditionalListbox).getByRole('option', { name: xitun.label }),
+    ).toBeInTheDocument()
+  })
+
+  it('既有單一名稱查詢（羅東、西屯、信義區）不會因新增的比對而回歸', async () => {
+    const user = userEvent.setup()
+    render(<App />)
+
+    const input = screen.getByLabelText('地點')
+
+    await user.type(input, '羅東')
+    let listbox = await screen.findByRole('listbox')
+    expect(within(listbox).getByRole('option', { name: luodong.label })).toBeInTheDocument()
+
+    await user.clear(input)
+    await user.type(input, '西屯')
+    listbox = await screen.findByRole('listbox')
+    expect(within(listbox).getByRole('option', { name: xitun.label })).toBeInTheDocument()
+
+    await user.clear(input)
+    await user.type(input, '信義區')
+    listbox = await screen.findByRole('listbox')
+    expect(within(listbox).getByRole('option', { name: xinyi.label })).toBeInTheDocument()
   })
 })

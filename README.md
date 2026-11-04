@@ -7,8 +7,10 @@
 ```
 luodong-restaurants/
 ├── backend/   Express API，預設 port 3002，依 lat/lng 用 Google Places API (New) 抓資料並快取
-└── frontend/  React + Vite，Google Maps JavaScript API 地圖 + 清單 + 地點搜尋（PlaceAutocompleteElement）
+└── frontend/  React + Vite，Google Maps JavaScript API 地圖 + 清單 + 地點選擇（本地鄉鎮市區搜尋為主，Google PlaceAutocompleteElement 為選用的地址/地標搜尋）
 ```
+
+地點選擇欄位的主要輸入是**本地搜尋**：資料來自 `frontend/src/data/taiwan-districts.json`（全台 368 個鄉鎮市區中心點，見該檔與 `scripts/build-districts.mjs` 的來源說明），不呼叫任何外部 API，因此不受 Google Places Autocomplete 每日配額限制影響。Google 地址/地標搜尋收在「用地址或地標搜尋（Google，選用）」這個預設收合的區塊裡，沒有金鑰、額度用完或載入失敗時都不影響本地搜尋。
 
 ## 事前準備：Google Maps Platform API 金鑰
 
@@ -16,7 +18,7 @@ luodong-restaurants/
 
 - **前端**（`frontend/.env`）需要啟用：
   - **Maps JavaScript API**（顯示地圖）
-  - **Places API (New)**（地點搜尋欄位用新版 `google.maps.places.PlaceAutocompleteElement`，走 Places API (New)；較新建立的 Google Cloud 專案通常已無法啟用舊版 Places API，不受影響）
+  - **Places API (New)**（選用的「用地址或地標搜尋」欄位用新版 `google.maps.places.PlaceAutocompleteElement`，走 Places API (New)；較新建立的 Google Cloud 專案通常已無法啟用舊版 Places API，不受影響。這支 API 每日呼叫次數有配額限制，用完時該欄位會載入失敗，但不影響主要的本地鄉鎮市區搜尋）
 - **後端**（`backend/.env`）需要啟用：
   - **Places API (New)**（依座標抓附近餐廳）
 
@@ -79,7 +81,7 @@ VITE_GOOGLE_MAPS_API_KEY=你的金鑰
 ## 使用流程
 
 1. 啟動後端與前端（見上方指令）。
-2. 開啟 `http://localhost:5173`，先在「地點」欄位搜尋地址，或點「使用目前位置」。
+2. 開啟 `http://localhost:5173`，先在「地點」欄位輸入縣市或鄉鎮市區（例如「羅東」「信義」），從下拉選單選一個，或點「使用目前位置」；也可以展開「用地址或地標搜尋（Google，選用）」用 Google 搜尋地址或地標。
 3. 選定地點後，前端才會帶該地點的 `lat`/`lng` 呼叫後端，後端若該地點快取已過期（超過 24 小時）或是第一次查詢，會即時呼叫 Google Places API 抓資料並快取；地圖與清單才會顯示該地點附近的餐廳資料。
 4. 換一個地點會重新走一次上述流程；原本選擇的分類若新地點沒有，會自動重置為「全部分類」。
 
