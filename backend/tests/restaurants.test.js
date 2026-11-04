@@ -73,6 +73,47 @@ describe('GET /api/restaurants', () => {
     );
   });
 
+  it('builds mapsUrl with the official Maps URLs API format (query + query_place_id)', async () => {
+    placesClient.fetchNearbyRestaurants.mockResolvedValue([makePlace('p1', '羅東夜市鹽酥雞', ['restaurant'])]);
+
+    const res = await request(app).get('/api/restaurants').query(LUODONG);
+
+    expect(res.status).toBe(200);
+    expect(res.body[0].mapsUrl).toBe(
+      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('羅東夜市鹽酥雞')}&query_place_id=p1`
+    );
+  });
+
+  it('recomputes mapsUrl in the current format even when the disk cache stored an old-format value', async () => {
+    const cacheKey = `${LUODONG.lat.toFixed(3)},${LUODONG.lng.toFixed(3)},4000`;
+    app.__setCacheForTest({
+      [cacheKey]: {
+        updatedAt: new Date().toISOString(),
+        restaurants: [
+          {
+            placeId: 'p1',
+            name: '羅東夜市鹽酥雞',
+            rating: 4.0,
+            userRatingsTotal: 10,
+            address: 'addr-p1',
+            lat: LUODONG.lat,
+            lng: LUODONG.lng,
+            category: '小吃',
+            mapsUrl: 'https://www.google.com/maps/place/?q=place_id:p1',
+          },
+        ],
+      },
+    });
+
+    const res = await request(app).get('/api/restaurants').query(LUODONG);
+
+    expect(res.status).toBe(200);
+    expect(placesClient.fetchNearbyRestaurants).not.toHaveBeenCalled();
+    expect(res.body[0].mapsUrl).toBe(
+      `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('羅東夜市鹽酥雞')}&query_place_id=p1`
+    );
+  });
+
   it('serves from cache on a second request within 24h for the same location, without re-calling the Places API', async () => {
     placesClient.fetchNearbyRestaurants.mockResolvedValue([makePlace('p1', '羅東夜市鹽酥雞', ['restaurant'])]);
 

@@ -47,8 +47,9 @@ const inFlightFetches = new Map();
   }
 })();
 
-function mapsUrlFor(placeId) {
-  return `https://www.google.com/maps/place/?q=place_id:${placeId}`;
+function mapsUrlFor(name, placeId) {
+  const params = new URLSearchParams({ api: '1', query: name, query_place_id: placeId });
+  return `https://www.google.com/maps/search/?${params.toString()}`;
 }
 
 function mapPlaceToRestaurant(place) {
@@ -62,7 +63,7 @@ function mapPlaceToRestaurant(place) {
     lat: place.location?.latitude ?? null,
     lng: place.location?.longitude ?? null,
     category: categorize(name, place.types),
-    mapsUrl: mapsUrlFor(place.id),
+    mapsUrl: mapsUrlFor(name, place.id),
   };
 }
 
@@ -174,7 +175,10 @@ app.get('/api/restaurants', async (req, res) => {
     list = [...list].sort((a, b) => (b.rating ?? -Infinity) - (a.rating ?? -Infinity));
   }
 
-  res.status(200).json(list);
+  // Recompute mapsUrl on every response instead of trusting the value stored
+  // in cacheMap, so a disk cache written before a mapsUrlFor change still
+  // serves links in the current format without a manual cache bust.
+  res.status(200).json(list.map((r) => ({ ...r, mapsUrl: mapsUrlFor(r.name, r.placeId) })));
 });
 
 app.get('/api/categories', async (req, res) => {
