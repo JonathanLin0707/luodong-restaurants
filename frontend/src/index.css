@@ -1,0 +1,273 @@
+:root {
+  color-scheme: light;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+body {
+  margin: 0;
+  background: #f7f7f8;
+  color: #1a1a1a;
+}
+
+.app {
+  max-width: 1080px;
+  margin: 2rem auto;
+  padding: 1.5rem;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.location-picker {
+  margin: 1rem 0;
+}
+
+.location-picker label {
+  display: block;
+  margin-bottom: 0.4rem;
+  font-weight: 600;
+}
+
+.location-picker-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.location-search-container {
+  flex: 1 1 240px;
+}
+
+.location-search-container .location-search-input {
+  display: block;
+  width: 100%;
+}
+
+.use-current-location-button {
+  flex: 0 0 auto;
+  padding: 0.45rem 0.8rem;
+  border: 1px solid #3366ff;
+  border-radius: 6px;
+  background: #fff;
+  color: #3366ff;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.use-current-location-button:hover:not(:disabled) {
+  background: #eef2ff;
+}
+
+.use-current-location-button:disabled {
+  border-color: #ccc;
+  color: #999;
+  cursor: not-allowed;
+}
+
+.location-geo-error {
+  margin: 0.5rem 0 0;
+  color: #b00020;
+  font-size: 0.85rem;
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  align-items: center;
+  margin: 1rem 0;
+}
+
+.category-filter select {
+  margin-left: 0.5rem;
+  padding: 0.3rem;
+}
+
+.draw-candidates-button {
+  padding: 0.4rem 0.8rem;
+  border: 1px solid #3366ff;
+  border-radius: 6px;
+  background: #fff;
+  color: #3366ff;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.draw-candidates-button:hover:not(:disabled) {
+  background: #eef2ff;
+}
+
+.draw-candidates-button:disabled {
+  border-color: #ccc;
+  color: #999;
+  cursor: not-allowed;
+}
+
+.candidate-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+  padding: 0.6rem 0.75rem;
+  background: #eef2ff;
+  border-radius: 6px;
+}
+
+.candidate-banner-text {
+  margin: 0;
+  color: #3344aa;
+  font-size: 0.9rem;
+}
+
+.candidate-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex: 0 0 auto;
+}
+
+.candidate-actions button {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid #3366ff;
+  border-radius: 6px;
+  background: #fff;
+  color: #3366ff;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.candidate-actions button:hover {
+  background: #e3e9ff;
+}
+
+.layout {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 1.5rem;
+}
+
+.list-column,
+.map-column {
+  min-width: 0;
+}
+
+@media (min-width: 768px) {
+  .layout {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+
+  .list-column {
+    flex: 1 1 50%;
+    max-height: 640px;
+    overflow-y: auto;
+  }
+
+  .map-column {
+    flex: 1 1 50%;
+    position: sticky;
+    top: 1rem;
+  }
+}
+
+.map-section {
+  margin: 1rem 0;
+}
+
+@media (min-width: 768px) {
+  .map-section {
+    margin: 0;
+  }
+}
+
+.map-container {
+  width: 100%;
+  height: 320px;
+  background: #e8e8e8;
+  border-radius: 6px;
+}
+
+@media (min-width: 768px) {
+  .map-container {
+    height: 560px;
+  }
+}
+
+.restaurant-list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+
+.restaurant-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  border-bottom: 1px solid #eee;
+  padding: 0.75rem 0;
+}
+
+.restaurant-card-selected {
+  background: #eef2ff;
+  border-radius: 6px;
+  padding: 0.75rem 0.5rem;
+}
+
+.restaurant-card-main {
+  display: block;
+  cursor: pointer;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.open-maps-link {
+  flex: 0 0 auto;
+  background: none;
+  border: none;
+  color: #3366ff;
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0.15rem 0.3rem;
+  white-space: nowrap;
+}
+
+.open-maps-link:hover {
+  text-decoration: underline;
+}
+
+.restaurant-name {
+  margin: 0 0 0.25rem;
+}
+
+.restaurant-rating,
+.restaurant-address {
+  margin: 0.15rem 0;
+  color: #444;
+}
+
+.category-tag {
+  display: inline-block;
+  margin-top: 0.3rem;
+  padding: 0.15rem 0.5rem;
+  background: #eef2ff;
+  color: #3344aa;
+  border-radius: 999px;
+  font-size: 0.8rem;
+}
+
+[role='button']:focus-visible,
+button:focus-visible,
+select:focus-visible,
+input:focus-visible {
+  outline: 2px solid #3366ff;
+  outline-offset: 2px;
+}
+
+.error-banner {
+  color: #b00020;
+}
+
+.empty-state {
+  color: #666;
+}

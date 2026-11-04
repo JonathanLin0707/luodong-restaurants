@@ -1,0 +1,10 @@
+{
+  "name": "luodong-restaurants",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Root convenience scripts; Render deploys use render.yaml directly.",
+  "scripts": {
+    "build": "npm --prefix backend install --omit=dev && npm --prefix frontend install --include=dev && npm --prefix frontend run build",
+    "start": "node backend/src/server.js"
+  }
+}
