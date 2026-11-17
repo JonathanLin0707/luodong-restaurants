@@ -28,6 +28,9 @@ const MIN_RADIUS_METERS = 100;
 const MAX_RADIUS_METERS = 10000;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 20;
+const SCHEMA_VERSION = 2;
+const MAX_PLACES_PER_PAGE = 20;
+const REFRESH_COOLDOWN_MS = 5 * 60 * 1000;
 
 const app = express();
 
@@ -39,6 +42,9 @@ let cacheMap = {};
 // Per-cacheKey in-flight fetches, so concurrent /api/restaurants and
 // /api/categories requests for the same location share one Places API call.
 const inFlightFetches = new Map();
+
+// Per-IP refresh cooldown timestamps.
+const refreshCooldowns = new Map();
 
 (function loadFromCache() {
   const cached = cache.load();
@@ -52,8 +58,30 @@ function mapsUrlFor(name, placeId) {
   return `https://www.google.com/maps/search/?${params.toString()}`;
 }
 
+const PRICE_LEVEL_MAP = {
+  PRICE_LEVEL_FREE: 0,
+  PRICE_LEVEL_INEXPENSIVE: 1,
+  PRICE_LEVEL_MODERATE: 2,
+  PRICE_LEVEL_EXPENSIVE: 3,
+  PRICE_LEVEL_VERY_EXPENSIVE: 4,
+};
+
+function normalizePriceLevel(raw) {
+  if (raw === null || raw === undefined) return null;
+  if (typeof raw === 'number' && Number.isFinite(raw)) return Math.trunc(raw);
+  if (typeof raw === 'string') {
+    if (Object.prototype.hasOwnProperty.call(PRICE_LEVEL_MAP, raw)) {
+      return PRICE_LEVEL_MAP[raw];
+    }
+    const n = Number(raw);
+    if (Number.isFinite(n)) return Math.trunc(n);
+  }
+  return null;
+}
+
 function mapPlaceToRestaurant(place) {
   const name = place.displayName?.text || '';
+  const openNow = place.currentOpeningHours?.openNow;
   return {
     placeId: place.id,
     name,
@@ -64,6 +92,8 @@ function mapPlaceToRestaurant(place) {
     lng: place.location?.longitude ?? null,
     category: categorize(name, place.types),
     mapsUrl: mapsUrlFor(name, place.id),
+    isOpen: typeof openNow === 'boolean' ? openNow : null,
+    priceLevel: normalizePriceLevel(place.priceLevel),
   };
 }
 
@@ -91,19 +121,67 @@ function resolveRadius(rawRadius) {
   return radius;
 }
 
+function resolvePages(rawPages) {
+  if (rawPages === undefined) return 1;
+  const pages = Number(rawPages);
+  if (!Number.isFinite(pages)) return 1;
+  return Math.min(3, Math.max(1, Math.trunc(pages)));
+}
+
+function haversineMeters(lat1, lng1, lat2, lng2) {
+  if (!Number.isFinite(lat1) || !Number.isFinite(lng1) || !Number.isFinite(lat2) || !Number.isFinite(lng2)) {
+    return null;
+  }
+  const R = 6371000;
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return Math.round(R * c);
+}
+
+function clientIp(req) {
+  return (req.ip || req.socket?.remoteAddress || 'unknown').toString();
+}
+
+function refreshAllowed(req) {
+  const token = process.env.REFRESH_TOKEN;
+  if (token) {
+    const headerToken =
+      req.headers['x-refresh-token'] ||
+      req.headers['refresh-token'] ||
+      (typeof req.headers.authorization === 'string' && req.headers.authorization.startsWith('Bearer ')
+        ? req.headers.authorization.slice(7)
+        : null);
+    if (headerToken && headerToken === token) return true;
+  }
+  const now = Date.now();
+  const ip = clientIp(req);
+  const last = refreshCooldowns.get(ip);
+  if (last && now - last < REFRESH_COOLDOWN_MS) {
+    return false;
+  }
+  refreshCooldowns.set(ip, now);
+  return true;
+}
+
 function cacheKeyFor(lat, lng, radius) {
   return `${lat.toFixed(3)},${lng.toFixed(3)},${radius}`;
 }
 
 function isFresh(entry) {
   if (!entry || typeof entry.updatedAt !== 'string') return false;
+  if (entry.schemaVersion !== SCHEMA_VERSION) return false;
   const age = Date.now() - new Date(entry.updatedAt).getTime();
   return Number.isFinite(age) && age < CACHE_TTL_MS;
 }
 
 function setCacheEntry(key, restaurantsList) {
   const updatedAt = new Date().toISOString();
-  cacheMap[key] = { restaurants: restaurantsList, updatedAt };
+  cacheMap[key] = { restaurants: restaurantsList, updatedAt, schemaVersion: SCHEMA_VERSION };
 
   const keys = Object.keys(cacheMap);
   if (keys.length > MAX_CACHE_ENTRIES) {
@@ -119,14 +197,46 @@ function setCacheEntry(key, restaurantsList) {
   return cacheMap[key];
 }
 
-async function fetchAndCache(key, lat, lng, radius) {
-  const places = await placesClient.fetchNearbyRestaurants({ lat, lng, radiusMeters: radius });
-  const mapped = places.map(mapPlaceToRestaurant);
-  return setCacheEntry(key, mapped);
+function normalizePlacesResult(result) {
+  if (Array.isArray(result)) {
+    return { places: result, nextPageToken: result.nextPageToken };
+  }
+  if (result && Array.isArray(result.places)) {
+    return { places: result.places, nextPageToken: result.nextPageToken || result.next_page_token };
+  }
+  if (result && Array.isArray(result.results)) {
+    return { places: result.results, nextPageToken: result.nextPageToken || result.next_page_token };
+  }
+  return { places: [], nextPageToken: undefined };
+}
+
+async function fetchPlacesPage(params) {
+  const result = await placesClient.fetchNearbyRestaurants(params);
+  return normalizePlacesResult(result);
+}
+
+async function fetchAndCache(key, lat, lng, radius, pages = 1) {
+  const allPlaces = [];
+  let pageToken;
+  let hasMore = false;
+  const pageCount = Math.min(3, Math.max(1, Number.isFinite(pages) ? Math.trunc(pages) : 1));
+  for (let i = 0; i < pageCount; i++) {
+    const { places, nextPageToken } = await fetchPlacesPage({ lat, lng, radiusMeters: radius, pageToken });
+    allPlaces.push(...places.map(mapPlaceToRestaurant));
+    pageToken = nextPageToken;
+    if (!pageToken) {
+      hasMore = false;
+      break;
+    }
+    hasMore = true;
+  }
+  const entry = setCacheEntry(key, allPlaces);
+  entry.hasMore = hasMore;
+  return entry;
 }
 
 // Returns a fresh cache entry, joining (or starting) a shared fetch for this key.
-function getOrFetchEntry(key, lat, lng, radius) {
+function getOrFetchEntry(key, lat, lng, radius, pages = 1) {
   const entry = cacheMap[key];
   if (isFresh(entry)) {
     return Promise.resolve(entry);
@@ -137,7 +247,7 @@ function getOrFetchEntry(key, lat, lng, radius) {
     return inFlight;
   }
 
-  const promise = fetchAndCache(key, lat, lng, radius).finally(() => {
+  const promise = fetchAndCache(key, lat, lng, radius, pages).finally(() => {
     if (inFlightFetches.get(key) === promise) {
       inFlightFetches.delete(key);
     }
@@ -157,17 +267,22 @@ app.get('/api/restaurants', async (req, res) => {
     return res.status(400).json({ error });
   }
   const radius = resolveRadius(req.query.radius);
+  const pages = resolvePages(req.query.pages);
   const key = cacheKeyFor(lat, lng, radius);
 
   let entry;
   try {
-    entry = await getOrFetchEntry(key, lat, lng, radius);
+    entry = await getOrFetchEntry(key, lat, lng, radius, pages);
   } catch (err) {
     console.error('Failed to fetch restaurants:', err.message);
     return res.status(502).json({ error: 'Failed to fetch restaurants from Google Places API' });
   }
 
-  let list = entry.restaurants;
+  let list = entry.restaurants.map((r) => ({
+    ...r,
+    mapsUrl: mapsUrlFor(r.name, r.placeId),
+    distanceMeters: haversineMeters(lat, lng, r.lat, r.lng),
+  }));
   if (category) {
     list = list.filter((r) => r.category === category);
   }
@@ -175,10 +290,15 @@ app.get('/api/restaurants', async (req, res) => {
     list = [...list].sort((a, b) => (b.rating ?? -Infinity) - (a.rating ?? -Infinity));
   }
 
-  // Recompute mapsUrl on every response instead of trusting the value stored
-  // in cacheMap, so a disk cache written before a mapsUrlFor change still
-  // serves links in the current format without a manual cache bust.
-  res.status(200).json(list.map((r) => ({ ...r, mapsUrl: mapsUrlFor(r.name, r.placeId) })));
+  const maxItems = pages * MAX_PLACES_PER_PAGE;
+  const sliced = list.slice(0, maxItems);
+
+  res.status(200).json({
+    restaurants: sliced,
+    returnedCount: sliced.length,
+    hasMore: Boolean(entry.hasMore),
+    count: sliced.length,
+  });
 });
 
 app.get('/api/categories', async (req, res) => {
@@ -191,7 +311,7 @@ app.get('/api/categories', async (req, res) => {
 
   let entry;
   try {
-    entry = await getOrFetchEntry(key, lat, lng, radius);
+    entry = await getOrFetchEntry(key, lat, lng, radius, 1);
   } catch (err) {
     console.error('Failed to fetch categories:', err.message);
     return res.status(502).json({ error: 'Failed to fetch categories from Google Places API' });
@@ -207,11 +327,14 @@ app.post('/api/restaurants/refresh', async (req, res) => {
   if (error) {
     return res.status(400).json({ error });
   }
+  if (!refreshAllowed(req)) {
+    return res.status(429).json({ error: 'Refresh cooldown active; try again later' });
+  }
   const radius = resolveRadius(req.query.radius);
   const key = cacheKeyFor(lat, lng, radius);
 
   try {
-    const entry = await fetchAndCache(key, lat, lng, radius);
+    const entry = await fetchAndCache(key, lat, lng, radius, 1);
     res.status(200).json({ count: entry.restaurants.length, updatedAt: entry.updatedAt });
   } catch (err) {
     console.error('Failed to refresh restaurants:', err.message);
@@ -223,7 +346,12 @@ app.post('/api/restaurants/refresh', async (req, res) => {
 app.__setCacheForTest = (map) => {
   cacheMap = map;
   inFlightFetches.clear();
+  refreshCooldowns.clear();
 };
+app.__resetRefreshCooldown = () => {
+  refreshCooldowns.clear();
+};
+app.SCHEMA_VERSION = SCHEMA_VERSION;
 
 // Serves the built frontend (frontend/dist) if present; in dev the frontend
 // runs separately on Vite (5173), so a missing dist just means we skip this.

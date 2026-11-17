@@ -6,10 +6,12 @@ const FIELD_MASK = [
   'places.formattedAddress',
   'places.location',
   'places.types',
+  'places.currentOpeningHours',
+  'places.priceLevel',
 ].join(',');
 const MAX_RESULT_COUNT = 20;
 
-async function fetchNearbyRestaurants({ lat, lng, radiusMeters }) {
+async function fetchNearbyRestaurants({ lat, lng, radiusMeters, pageToken }) {
   const apiKey = process.env.GOOGLE_MAPS_API_KEY;
   if (!apiKey) {
     throw new Error('GOOGLE_MAPS_API_KEY is not set');
@@ -26,6 +28,9 @@ async function fetchNearbyRestaurants({ lat, lng, radiusMeters }) {
       },
     },
   };
+  if (pageToken) {
+    body.pageToken = pageToken;
+  }
 
   const response = await fetch('https://places.googleapis.com/v1/places:searchNearby', {
     method: 'POST',
@@ -43,7 +48,7 @@ async function fetchNearbyRestaurants({ lat, lng, radiusMeters }) {
   }
 
   const data = await response.json();
-  return data.places || [];
+  return { places: data.places || [], nextPageToken: data.nextPageToken };
 }
 
 module.exports = { fetchNearbyRestaurants };

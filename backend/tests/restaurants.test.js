@@ -79,7 +79,7 @@ describe('GET /api/restaurants', () => {
     const res = await request(app).get('/api/restaurants').query(LUODONG);
 
     expect(res.status).toBe(200);
-    expect(res.body[0].mapsUrl).toBe(
+    expect(res.body.restaurants[0].mapsUrl).toBe(
       `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('羅東夜市鹽酥雞')}&query_place_id=p1`
     );
   });
@@ -89,6 +89,7 @@ describe('GET /api/restaurants', () => {
     app.__setCacheForTest({
       [cacheKey]: {
         updatedAt: new Date().toISOString(),
+        schemaVersion: 2,
         restaurants: [
           {
             placeId: 'p1',
@@ -109,7 +110,7 @@ describe('GET /api/restaurants', () => {
 
     expect(res.status).toBe(200);
     expect(placesClient.fetchNearbyRestaurants).not.toHaveBeenCalled();
-    expect(res.body[0].mapsUrl).toBe(
+    expect(res.body.restaurants[0].mapsUrl).toBe(
       `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent('羅東夜市鹽酥雞')}&query_place_id=p1`
     );
   });
@@ -119,11 +120,11 @@ describe('GET /api/restaurants', () => {
 
     const first = await request(app).get('/api/restaurants').query(LUODONG);
     expect(first.status).toBe(200);
-    expect(first.body).toHaveLength(1);
+    expect(first.body.restaurants).toHaveLength(1);
 
     const second = await request(app).get('/api/restaurants').query(LUODONG);
     expect(second.status).toBe(200);
-    expect(second.body).toHaveLength(1);
+    expect(second.body.restaurants).toHaveLength(1);
 
     expect(placesClient.fetchNearbyRestaurants).toHaveBeenCalledTimes(1);
   });
@@ -136,13 +137,13 @@ describe('GET /api/restaurants', () => {
     const luodongRes = await request(app).get('/api/restaurants').query(LUODONG);
     const taipeiRes = await request(app).get('/api/restaurants').query(TAIPEI);
 
-    expect(luodongRes.body.map((r) => r.placeId)).toEqual(['luodong-1']);
-    expect(taipeiRes.body.map((r) => r.placeId)).toEqual(['taipei-1']);
+    expect(luodongRes.body.restaurants.map((r) => r.placeId)).toEqual(['luodong-1']);
+    expect(taipeiRes.body.restaurants.map((r) => r.placeId)).toEqual(['taipei-1']);
     expect(placesClient.fetchNearbyRestaurants).toHaveBeenCalledTimes(2);
 
     // Re-requesting Luodong again still hits its own fresh cache entry, not Taipei's.
     const luodongAgain = await request(app).get('/api/restaurants').query(LUODONG);
-    expect(luodongAgain.body.map((r) => r.placeId)).toEqual(['luodong-1']);
+    expect(luodongAgain.body.restaurants.map((r) => r.placeId)).toEqual(['luodong-1']);
     expect(placesClient.fetchNearbyRestaurants).toHaveBeenCalledTimes(2);
   });
 
@@ -152,13 +153,14 @@ describe('GET /api/restaurants', () => {
       [staleKey]: {
         restaurants: [makePlace('old', '舊資料', ['restaurant'])],
         updatedAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
+        schemaVersion: 2,
       },
     });
     placesClient.fetchNearbyRestaurants.mockResolvedValue([makePlace('fresh', '新資料', ['restaurant'])]);
 
     const res = await request(app).get('/api/restaurants').query(LUODONG);
     expect(res.status).toBe(200);
-    expect(res.body.map((r) => r.placeId)).toEqual(['fresh']);
+    expect(res.body.restaurants.map((r) => r.placeId)).toEqual(['fresh']);
     expect(placesClient.fetchNearbyRestaurants).toHaveBeenCalledTimes(1);
   });
 
@@ -178,18 +180,19 @@ describe('GET /api/restaurants', () => {
           { placeId: '3', name: 'C', rating: 3.9, category: '日式' },
         ],
         updatedAt: new Date().toISOString(),
+        schemaVersion: 2,
       },
     });
 
     const filtered = await request(app)
       .get('/api/restaurants')
       .query({ ...LUODONG, category: '火鍋' });
-    expect(filtered.body.map((r) => r.placeId)).toEqual(['2']);
+    expect(filtered.body.restaurants.map((r) => r.placeId)).toEqual(['2']);
 
     const sorted = await request(app)
       .get('/api/restaurants')
       .query({ ...LUODONG, sort: 'rating' });
-    expect(sorted.body.map((r) => r.placeId)).toEqual(['2', '1', '3']);
+    expect(sorted.body.restaurants.map((r) => r.placeId)).toEqual(['2', '1', '3']);
 
     expect(placesClient.fetchNearbyRestaurants).not.toHaveBeenCalled();
   });
@@ -218,7 +221,7 @@ describe('GET /api/categories', () => {
     expect(placesClient.fetchNearbyRestaurants).toHaveBeenCalledTimes(1);
 
     const restaurantsRes = await request(app).get('/api/restaurants').query(TAIPEI);
-    expect(new Set(res.body)).toEqual(new Set(restaurantsRes.body.map((r) => r.category)));
+    expect(new Set(res.body)).toEqual(new Set(restaurantsRes.body.restaurants.map((r) => r.category)));
     expect(placesClient.fetchNearbyRestaurants).toHaveBeenCalledTimes(1);
   });
 
@@ -232,6 +235,7 @@ describe('GET /api/categories', () => {
           { placeId: '3', category: '日式' },
         ],
         updatedAt: new Date().toISOString(),
+        schemaVersion: 2,
       },
     });
 
@@ -317,7 +321,7 @@ describe('POST /api/restaurants/refresh', () => {
     expect(cache.save).toHaveBeenCalledTimes(1);
 
     const listRes = await request(app).get('/api/restaurants').query(LUODONG);
-    expect(listRes.body).toHaveLength(2);
+    expect(listRes.body.restaurants).toHaveLength(2);
     expect(placesClient.fetchNearbyRestaurants).toHaveBeenCalledTimes(1);
   });
 
@@ -327,6 +331,7 @@ describe('POST /api/restaurants/refresh', () => {
       .mockResolvedValueOnce([makePlace('second', '稻荷食堂', ['japanese_restaurant'])]);
 
     await request(app).post('/api/restaurants/refresh').query(LUODONG);
+    app.__resetRefreshCooldown();
     const second = await request(app).post('/api/restaurants/refresh').query(LUODONG);
 
     expect(second.body.count).toBe(1);
