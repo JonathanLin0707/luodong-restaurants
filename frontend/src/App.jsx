@@ -5,9 +5,9 @@ import CategoryFilter from './components/CategoryFilter.jsx'
 import SortControl from './components/SortControl.jsx'
 import LocationPicker from './components/LocationPicker.jsx'
 import { fetchRestaurants, fetchCategories } from './api.js'
+import { parseAppUrl, syncAppUrl } from './urlState.js'
 
 const CANDIDATE_COUNT = 5
-const DEFAULT_RADIUS_METERS = 4000
 
 function shuffleArray(array) {
   const result = [...array]
@@ -19,11 +19,17 @@ function shuffleArray(array) {
 }
 
 export default function App() {
-  const [location, setLocation] = useState(null)
+  // 第一次 render 就從網址還原條件：重新整理或開啟分享連結時，畫面直接是同一組查詢。
+  const [initialUrlState] = useState(() =>
+    parseAppUrl(typeof window === 'undefined' ? '' : window.location.search),
+  )
+  const [location, setLocation] = useState(initialUrlState.location)
   const [restaurants, setRestaurants] = useState([])
   const [categories, setCategories] = useState([])
-  const [selectedCategory, setSelectedCategory] = useState('')
-  const [sortByRating, setSortByRating] = useState(false)
+  const [selectedCategory, setSelectedCategory] = useState(initialUrlState.category)
+  const [sortByRating, setSortByRating] = useState(initialUrlState.sort === 'rating')
+  // 半徑目前跟著網址走（預設 4000）；下一批接上半徑調整滑桿時直接從這裡改。
+  const [radius] = useState(initialUrlState.radius)
   const [status, setStatus] = useState('idle') // idle | loading | ready | error
   const [errorMessage, setErrorMessage] = useState('')
   const [selectedPlaceId, setSelectedPlaceId] = useState(null)
@@ -31,13 +37,22 @@ export default function App() {
   const [candidatePlaceIds, setCandidatePlaceIds] = useState(null)
 
   useEffect(() => {
+    syncAppUrl({
+      location,
+      radius,
+      category: selectedCategory,
+      sort: sortByRating ? 'rating' : '',
+    })
+  }, [location, radius, selectedCategory, sortByRating])
+
+  useEffect(() => {
     if (!location) return
-    fetchCategories({ lat: location.lat, lng: location.lng, radius: DEFAULT_RADIUS_METERS })
+    fetchCategories({ lat: location.lat, lng: location.lng, radius })
       .then(setCategories)
       .catch(() => {
         setCategories([])
       })
-  }, [location])
+  }, [location, radius])
 
   useEffect(() => {
     // 換地點後，若新地點的分類清單沒有原本選的分類，就自動回到全部分類。
@@ -58,7 +73,7 @@ export default function App() {
         sort: sortByRating ? 'rating' : undefined,
         lat: location.lat,
         lng: location.lng,
-        radius: DEFAULT_RADIUS_METERS,
+        radius,
       })
       setRestaurants(data)
       setStatus('ready')
@@ -66,7 +81,7 @@ export default function App() {
       setErrorMessage(err.message || '載入餐廳資料失敗')
       setStatus('error')
     }
-  }, [location, selectedCategory, sortByRating])
+  }, [location, radius, selectedCategory, sortByRating])
 
   useEffect(() => {
     loadRestaurants()
@@ -74,7 +89,7 @@ export default function App() {
 
   useEffect(() => {
     setCandidatePlaceIds(null)
-  }, [location, selectedCategory, sortByRating])
+  }, [location, radius, selectedCategory, sortByRating])
 
   const displayedRestaurants = useMemo(() => {
     if (!candidatePlaceIds) return restaurants
@@ -115,7 +130,10 @@ export default function App() {
     <main className="app">
       <h1>附近餐廳推薦{location ? `：${location.label}` : ''}</h1>
 
-      <LocationPicker onLocationChange={handleLocationChange} />
+      <LocationPicker
+        onLocationChange={handleLocationChange}
+        initialQuery={initialUrlState.locationQuery}
+      />
 
       {location && (
         <div className="controls">

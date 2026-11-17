@@ -45,7 +45,7 @@ function searchDistricts(query) {
   return matched.slice(0, MAX_SUGGESTIONS)
 }
 
-export default function LocationPicker({ onLocationChange }) {
+export default function LocationPicker({ onLocationChange, initialQuery = '' }) {
   const listboxId = useId()
   const inputRef = useRef(null)
   const containerRef = useRef(null)
@@ -54,7 +54,7 @@ export default function LocationPicker({ onLocationChange }) {
   const [geoLoading, setGeoLoading] = useState(false)
   const [geoMessage, setGeoMessage] = useState('')
 
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(initialQuery)
   const [isOpen, setIsOpen] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
 

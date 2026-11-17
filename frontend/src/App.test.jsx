@@ -134,6 +134,8 @@ beforeEach(() => {
   createdAutocompleteElements = []
   mapsLoader.loadGoogleMaps.mockResolvedValue(fakeMapsApi)
   window.open = vi.fn()
+  // 每個測試從乾淨網址開始；App 會把篩選條件寫回網址，避免上一個測試的條件汙染下一個。
+  window.history.replaceState(null, '', '/')
   Element.prototype.scrollIntoView = vi.fn()
   Object.defineProperty(window.navigator, 'geolocation', {
     value: { getCurrentPosition: vi.fn() },
@@ -1026,5 +1028,222 @@ describe('App - 地點本地搜尋（縣市＋鄉鎮連寫、全形臺、空白�
     await user.type(input, '信義區')
     listbox = await screen.findByRole('listbox')
     expect(within(listbox).getByRole('option', { name: xinyi.label })).toBeInTheDocument()
+  })
+})
+
+
+const LUODONG = taiwanDistricts.find((district) => district.label === '宜蘭縣羅東鎮')
+
+function setUrl(search) {
+  window.history.replaceState(null, '', search ? `/?${search}` : '/')
+}
+
+function urlParams() {
+  return new URLSearchParams(window.location.search)
+}
+
+describe('App - 篩選條件寫入網址（重新整理不遺失、可分享）', () => {
+  it('選好地點後就把 lat/lng 寫進網址，且不把預設半徑一起寫進去', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+
+    render(<App />)
+    expect(window.location.search).toBe('')
+
+    await pickLocation()
+    await screen.findByText('羅東夜市小吃')
+
+    const params = urlParams()
+    expect(params.get('lat')).toBe('24.6778')
+    expect(params.get('lng')).toBe('121.7684')
+    expect(params.get('radius')).toBeNull()
+    expect(params.get('category')).toBeNull()
+    expect(params.get('sort')).toBeNull()
+  })
+
+  it('分類與排序會寫進網址，取消後也從網址移除', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+
+    const user = userEvent.setup()
+    render(<App />)
+    await pickLocation()
+    await screen.findByText('羅東夜市小吃')
+
+    await user.selectOptions(screen.getByLabelText('分類篩選'), '台式')
+    await waitFor(() => expect(urlParams().get('category')).toBe('台式'))
+
+    await user.click(screen.getByRole('checkbox', { name: /依星數排序/ }))
+    await waitFor(() => expect(urlParams().get('sort')).toBe('rating'))
+
+    // 兩個條件同時存在時，網址仍要留著座標
+    expect(urlParams().get('lat')).toBe('24.6778')
+
+    await user.selectOptions(screen.getByLabelText('分類篩選'), '')
+    await waitFor(() => expect(urlParams().get('category')).toBeNull())
+
+    await user.click(screen.getByRole('checkbox', { name: /依星數排序/ }))
+    await waitFor(() => expect(urlParams().get('sort')).toBeNull())
+  })
+
+  it('用 replaceState 更新網址，不會每一步篩選都多一筆瀏覽器上一頁紀錄', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+
+    const pushState = vi.spyOn(window.history, 'pushState')
+    const replaceState = vi.spyOn(window.history, 'replaceState')
+
+    const user = userEvent.setup()
+    render(<App />)
+    await pickLocation()
+    await screen.findByText('羅東夜市小吃')
+    await user.selectOptions(screen.getByLabelText('分類篩選'), '台式')
+
+    await waitFor(() => expect(urlParams().get('category')).toBe('台式'))
+    expect(replaceState).toHaveBeenCalled()
+    expect(pushState).not.toHaveBeenCalled()
+
+    pushState.mockRestore()
+    replaceState.mockRestore()
+  })
+
+  it('網址裡其他無關參數（例如 utm_source）不會被篩選動作清掉', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    setUrl('utm_source=line')
+
+    render(<App />)
+    await pickLocation()
+    await screen.findByText('羅東夜市小吃')
+
+    expect(urlParams().get('utm_source')).toBe('line')
+    expect(urlParams().get('lat')).toBe('24.6778')
+  })
+
+  it('分享連結一開啟就帶回地點、半徑、分類與排序，也還原畫面欄位', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    setUrl(
+      `lat=${LUODONG.lat}&lng=${LUODONG.lng}&radius=6000&category=${encodeURIComponent('台式')}&sort=rating`,
+    )
+
+    render(<App />)
+
+    expect(screen.queryByText('請先選擇地點，才能顯示附近餐廳。')).not.toBeInTheDocument()
+    expect(screen.getByText('附近餐廳推薦：宜蘭縣羅東鎮')).toBeInTheDocument()
+    expect(screen.getByLabelText('地點')).toHaveValue('宜蘭縣羅東鎮')
+
+    await waitFor(() =>
+      expect(api.fetchCategories).toHaveBeenCalledWith({
+        lat: LUODONG.lat,
+        lng: LUODONG.lng,
+        radius: 6000,
+      }),
+    )
+    await waitFor(() =>
+      expect(api.fetchRestaurants).toHaveBeenCalledWith({
+        category: '台式',
+        sort: 'rating',
+        lat: LUODONG.lat,
+        lng: LUODONG.lng,
+        radius: 6000,
+      }),
+    )
+
+    expect(await screen.findByLabelText('分類篩選')).toHaveValue('台式')
+    expect(screen.getByRole('checkbox', { name: /依星數排序/ })).toBeChecked()
+  })
+
+  it('重新整理（模擬 F5）後仍是同一組條件，不會跳回未選地點', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+
+    const user = userEvent.setup()
+    const first = render(<App />)
+    await pickLocation()
+    await screen.findByText('羅東夜市小吃')
+    await user.selectOptions(screen.getByLabelText('分類篩選'), '台式')
+    await user.click(screen.getByRole('checkbox', { name: /依星數排序/ }))
+    await waitFor(() => expect(urlParams().get('sort')).toBe('rating'))
+
+    const sharedSearch = window.location.search
+    expect(sharedSearch).toContain('lat=24.6778')
+    expect(sharedSearch).toContain('sort=rating')
+
+    first.unmount()
+    api.fetchRestaurants.mockClear()
+    api.fetchCategories.mockClear()
+
+    render(<App />)
+
+    await waitFor(() =>
+      expect(api.fetchRestaurants).toHaveBeenCalledWith({
+        category: '台式',
+        sort: 'rating',
+        lat: DEFAULT_LOCATION.lat,
+        lng: DEFAULT_LOCATION.lng,
+        radius: 4000,
+      }),
+    )
+    expect(screen.queryByText('請先選擇地點，才能顯示附近餐廳。')).not.toBeInTheDocument()
+  })
+
+  it('網址 radius 超出 100–10000 或不是數字時，回退預設 4000 並把網址修成乾淨值', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    setUrl('lat=24.6778&lng=121.7684&radius=99999')
+
+    render(<App />)
+
+    await waitFor(() =>
+      expect(api.fetchRestaurants).toHaveBeenCalledWith({
+        category: undefined,
+        sort: undefined,
+        lat: 24.6778,
+        lng: 121.7684,
+        radius: 4000,
+      }),
+    )
+    await waitFor(() => expect(urlParams().get('radius')).toBeNull())
+  })
+
+  it('網址座標不合法或只有一半時，視為尚未選地點，不打任何 API', async () => {
+    for (const search of ['lat=abc&lng=121.7684', 'lat=91&lng=121.7684', 'lat=24.6778', 'lng=121.7684']) {
+      setUrl(`${search}&category=${encodeURIComponent('台式')}&sort=rating`)
+      const { unmount } = render(<App />)
+
+      expect(screen.getAllByText('請先選擇地點，才能顯示附近餐廳。').length).toBeGreaterThan(0)
+      expect(api.fetchRestaurants).not.toHaveBeenCalled()
+      expect(api.fetchCategories).not.toHaveBeenCalled()
+      // 殘留的分類/排序參數在沒有地點時不該留在網址上
+      expect(urlParams().get('lat')).toBeNull()
+      expect(urlParams().get('category')).toBeNull()
+      expect(urlParams().get('sort')).toBeNull()
+
+      unmount()
+      vi.clearAllMocks()
+    }
+  })
+
+  it('換地點後網址換成新座標，舊分類條件不會跟著帶過去', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    setUrl('lat=24.6778&lng=121.7684&category=' + encodeURIComponent('台式'))
+
+    const user = userEvent.setup()
+    render(<App />)
+    await screen.findByText('羅東夜市小吃')
+    await waitFor(() => expect(api.fetchRestaurants).toHaveBeenCalledTimes(1))
+
+    const input = screen.getByLabelText('地點')
+    await user.clear(input)
+    await user.type(input, '西屯')
+    const listbox = await screen.findByRole('listbox')
+    const xitun = taiwanDistricts.find((district) => district.label === '台中市西屯區')
+    await user.click(within(listbox).getByRole('option', { name: xitun.label }))
+
+    await waitFor(() => expect(urlParams().get('lat')).toBe('24.18309'))
+    expect(urlParams().get('category')).toBeNull()
+    expect(urlParams().get('lng')).toBe(String(Number(xitun.lng.toFixed(5))))
   })
 })
