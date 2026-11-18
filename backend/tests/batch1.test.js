@@ -93,6 +93,32 @@ describe('batch1 improvements', () => {
     expect(r.priceLevel).toBe(2);
   });
 
+  it('trusts X-Forwarded-For so each client gets its own refresh cooldown behind a proxy', async () => {
+    placesClient.fetchNearbyRestaurants.mockResolvedValue({
+      places: [makePlace('p1', '店', ['restaurant'])],
+      nextPageToken: undefined,
+    });
+    const fromA = await request(app)
+      .post('/api/restaurants/refresh')
+      .query(LUODONG)
+      .set('X-Forwarded-For', '203.0.113.1');
+    expect(fromA.status).toBe(200);
+
+    // Same proxy, different client IP: must not share client A's cooldown.
+    const fromB = await request(app)
+      .post('/api/restaurants/refresh')
+      .query(LUODONG)
+      .set('X-Forwarded-For', '203.0.113.2');
+    expect(fromB.status).toBe(200);
+
+    // Client A again, still within the cooldown window: still blocked.
+    const fromAAgain = await request(app)
+      .post('/api/restaurants/refresh')
+      .query(LUODONG)
+      .set('X-Forwarded-For', '203.0.113.1');
+    expect(fromAAgain.status).toBe(429);
+  });
+
   it('enforces a 5-minute refresh cooldown per IP (429), bypassable with REFRESH_TOKEN', async () => {
     placesClient.fetchNearbyRestaurants.mockResolvedValue({
       places: [makePlace('p1', '店', ['restaurant'])],
@@ -107,6 +133,23 @@ describe('batch1 improvements', () => {
     const third = await request(app).post('/api/restaurants/refresh').query(LUODONG).set('X-Refresh-Token', 'secret');
     expect(third.status).toBe(200);
     delete process.env.REFRESH_TOKEN;
+  });
+
+  it('does not let a pages=1 cache hit short-circuit a later pages=3 request', async () => {
+    placesClient.fetchNearbyRestaurants
+      .mockResolvedValueOnce({ places: [makePlace('p1', '店', ['restaurant'])], nextPageToken: 't1' })
+      .mockResolvedValueOnce({ places: Array.from({ length: 20 }, (_, i) => makePlace(`a${i}`, '店A', ['restaurant'])), nextPageToken: 't2' })
+      .mockResolvedValueOnce({ places: Array.from({ length: 20 }, (_, i) => makePlace(`b${i}`, '店B', ['restaurant'])), nextPageToken: 't3' })
+      .mockResolvedValueOnce({ places: Array.from({ length: 20 }, (_, i) => makePlace(`c${i}`, '店C', ['restaurant'])), nextPageToken: undefined });
+
+    const first = await request(app).get('/api/restaurants').query({ ...LUODONG, pages: 1 });
+    expect(first.body.restaurants).toHaveLength(1);
+    expect(placesClient.fetchNearbyRestaurants).toHaveBeenCalledTimes(1);
+
+    const second = await request(app).get('/api/restaurants').query({ ...LUODONG, pages: 3 });
+    expect(second.body.restaurants.length).toBe(60);
+    expect(second.body.returnedCount).toBe(60);
+    expect(placesClient.fetchNearbyRestaurants).toHaveBeenCalledTimes(4);
   });
 });
 

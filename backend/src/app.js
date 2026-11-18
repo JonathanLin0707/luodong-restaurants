@@ -34,6 +34,10 @@ const REFRESH_COOLDOWN_MS = 5 * 60 * 1000;
 
 const app = express();
 
+// Render sits behind a reverse proxy; without this, req.ip resolves to the
+// proxy's address, so every client shares one refresh cooldown.
+app.set('trust proxy', 1);
+
 app.use(cors({ origin: allowedOrigins }));
 app.use(express.json());
 
@@ -168,8 +172,12 @@ function refreshAllowed(req) {
   return true;
 }
 
-function cacheKeyFor(lat, lng, radius) {
-  return `${lat.toFixed(3)},${lng.toFixed(3)},${radius}`;
+function cacheKeyFor(lat, lng, radius, pages = 1) {
+  const base = `${lat.toFixed(3)},${lng.toFixed(3)},${radius}`;
+  // Keep the pages=1 key format unchanged for compatibility with on-disk cache
+  // files and single-page callers; a >1-page request gets its own entry so it
+  // can't be satisfied by a stale single-page cache hit (or vice versa).
+  return pages > 1 ? `${base},p${pages}` : base;
 }
 
 function isFresh(entry) {
@@ -268,7 +276,7 @@ app.get('/api/restaurants', async (req, res) => {
   }
   const radius = resolveRadius(req.query.radius);
   const pages = resolvePages(req.query.pages);
-  const key = cacheKeyFor(lat, lng, radius);
+  const key = cacheKeyFor(lat, lng, radius, pages);
 
   let entry;
   try {
