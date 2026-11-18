@@ -69,7 +69,7 @@ describe('GET /api/restaurants', () => {
 
     expect(res.status).toBe(200);
     expect(placesClient.fetchNearbyRestaurants).toHaveBeenCalledWith(
-      expect.objectContaining({ radiusMeters: 4000 })
+      expect.objectContaining({ radiusMeters: 1000 })
     );
   });
 
@@ -85,7 +85,7 @@ describe('GET /api/restaurants', () => {
   });
 
   it('recomputes mapsUrl in the current format even when the disk cache stored an old-format value', async () => {
-    const cacheKey = `${LUODONG.lat.toFixed(3)},${LUODONG.lng.toFixed(3)},4000`;
+    const cacheKey = `${LUODONG.lat.toFixed(3)},${LUODONG.lng.toFixed(3)},1000`;
     app.__setCacheForTest({
       [cacheKey]: {
         updatedAt: new Date().toISOString(),
@@ -148,7 +148,7 @@ describe('GET /api/restaurants', () => {
   });
 
   it('refetches once the cached entry is older than 24h', async () => {
-    const staleKey = `${LUODONG.lat.toFixed(3)},${LUODONG.lng.toFixed(3)},4000`;
+    const staleKey = `${LUODONG.lat.toFixed(3)},${LUODONG.lng.toFixed(3)},1000`;
     app.__setCacheForTest({
       [staleKey]: {
         restaurants: [makePlace('old', '舊資料', ['restaurant'])],
@@ -171,7 +171,7 @@ describe('GET /api/restaurants', () => {
   });
 
   it('filters by category and sorts by rating from the cached results', async () => {
-    const staleKey = `${LUODONG.lat.toFixed(3)},${LUODONG.lng.toFixed(3)},4000`;
+    const staleKey = `${LUODONG.lat.toFixed(3)},${LUODONG.lng.toFixed(3)},1000`;
     app.__setCacheForTest({
       [staleKey]: {
         restaurants: [
@@ -226,13 +226,13 @@ describe('GET /api/categories', () => {
   });
 
   it('returns the unique categories cached for that location, sorted by CATEGORY_ORDER', async () => {
-    const key = `${LUODONG.lat.toFixed(3)},${LUODONG.lng.toFixed(3)},4000`;
+    const key = `${LUODONG.lat.toFixed(3)},${LUODONG.lng.toFixed(3)},1000`;
     app.__setCacheForTest({
       [key]: {
         restaurants: [
-          { placeId: '1', category: '小吃' },
-          { placeId: '2', category: '火鍋' },
-          { placeId: '3', category: '日式' },
+          { placeId: '1', category: '小吃', rating: 4.0 },
+          { placeId: '2', category: '火鍋', rating: 4.0 },
+          { placeId: '3', category: '日式', rating: 4.0 },
         ],
         updatedAt: new Date().toISOString(),
         schemaVersion: 2,

@@ -11,6 +11,7 @@ const cors = require('cors');
 const placesClient = require('./placesClient');
 const cache = require('./cache');
 const { categorize, CATEGORY_ORDER } = require('./categorize');
+const { isQualifiedRestaurant } = require('./qualify');
 
 // Overridable in tests; defaults to the frontend's Vite build output.
 const FRONTEND_DIST_DIR = process.env.FRONTEND_DIST_DIR
@@ -23,7 +24,7 @@ const allowedOrigins = process.env.FRONTEND_ORIGIN
   ? process.env.FRONTEND_ORIGIN.split(',').map((o) => o.trim())
   : DEFAULT_ALLOWED_ORIGINS;
 
-const DEFAULT_RADIUS_METERS = 4000;
+const DEFAULT_RADIUS_METERS = 1000;
 const MIN_RADIUS_METERS = 100;
 const MAX_RADIUS_METERS = 10000;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -291,6 +292,7 @@ app.get('/api/restaurants', async (req, res) => {
     mapsUrl: mapsUrlFor(r.name, r.placeId),
     distanceMeters: haversineMeters(lat, lng, r.lat, r.lng),
   }));
+  list = list.filter(isQualifiedRestaurant);
   if (category) {
     list = list.filter((r) => r.category === category);
   }
@@ -304,8 +306,8 @@ app.get('/api/restaurants', async (req, res) => {
   res.status(200).json({
     restaurants: sliced,
     returnedCount: sliced.length,
-    hasMore: Boolean(entry.hasMore),
-    count: sliced.length,
+    hasMore: Boolean(entry.hasMore) && sliced.length > 0,
+    count: list.length,
   });
 });
 
@@ -325,7 +327,7 @@ app.get('/api/categories', async (req, res) => {
     return res.status(502).json({ error: 'Failed to fetch categories from Google Places API' });
   }
 
-  const present = new Set(entry.restaurants.map((r) => r.category));
+  const present = new Set(entry.restaurants.filter(isQualifiedRestaurant).map((r) => r.category));
   const categories = CATEGORY_ORDER.filter((c) => present.has(c));
   res.status(200).json(categories);
 });

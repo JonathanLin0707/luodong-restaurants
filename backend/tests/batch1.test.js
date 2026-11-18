@@ -41,7 +41,7 @@ describe('batch1 improvements', () => {
   });
 
   it('treats cache entries without schemaVersion as stale', async () => {
-    const key = `${LUODONG.lat.toFixed(3)},${LUODONG.lng.toFixed(3)},4000`;
+    const key = `${LUODONG.lat.toFixed(3)},${LUODONG.lng.toFixed(3)},1000`;
     app.__setCacheForTest({
       [key]: {
         restaurants: [{ placeId: 'old', name: '舊', rating: 4, category: '其他', lat: LUODONG.lat, lng: LUODONG.lng }],
