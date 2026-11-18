@@ -28,6 +28,7 @@ describe('urlState - 讀取網址', () => {
       radius: DEFAULT_RADIUS_METERS,
       category: '',
       sort: '',
+      openNow: false,
     })
   })
 
@@ -157,5 +158,49 @@ describe('urlState - 座標顯示', () => {
 
   it('純座標顯示到小數 5 位', () => {
     expect(formatCoordinates(24.677812345, 121.7684001)).toBe('24.67781, 121.7684')
+  })
+})
+
+describe('urlState - 排序與營業中（新）', () => {
+  it('sort=distance 會被解析為 distance', () => {
+    expect(parseAppUrl('?lat=24.6778&lng=121.7684&sort=distance').sort).toBe('distance')
+  })
+
+  it('未知排序值降級為空字串', () => {
+    expect(parseAppUrl('?lat=24.6778&lng=121.7684&sort=distance2').sort).toBe('')
+    expect(parseAppUrl('?lat=24.6778&lng=121.7684&sort=foo').sort).toBe('')
+  })
+
+  it('openNow=1 或 true 會被解析為 true，其他為 false', () => {
+    expect(parseAppUrl('?lat=24.6778&lng=121.7684&openNow=1').openNow).toBe(true)
+    expect(parseAppUrl('?lat=24.6778&lng=121.7684&openNow=true').openNow).toBe(true)
+    expect(parseAppUrl('?lat=24.6778&lng=121.7684&openNow=0').openNow).toBe(false)
+    expect(parseAppUrl('?lat=24.6778&lng=121.7684').openNow).toBe(false)
+  })
+
+  it('沒有地點時 openNow 與 sort 一併忽略', () => {
+    const state = parseAppUrl('?openNow=1&sort=distance')
+    expect(state.location).toBeNull()
+    expect(state.openNow).toBe(false)
+    expect(state.sort).toBe('')
+  })
+
+  it('toAppUrlParams：sort=distance 與 openNow=true 會寫入網址，預設不寫', () => {
+    const loc = { lat: 24.6778, lng: 121.7684 }
+    const params = toAppUrlParams({ location: loc, sort: 'distance', openNow: true })
+    expect(params.get('sort')).toBe('distance')
+    expect(params.get('openNow')).toBe('1')
+
+    const def = toAppUrlParams({ location: loc, sort: '', openNow: false })
+    expect(def.get('sort')).toBeNull()
+    expect(def.get('openNow')).toBeNull()
+  })
+
+  it('讀寫來回後 openNow / sort 不變', () => {
+    const loc = { lat: 24.6778, lng: 121.7684 }
+    const search = '?' + toAppUrlParams({ location: loc, sort: 'distance', openNow: true })
+    const parsed = parseAppUrl(search)
+    expect(parsed.sort).toBe('distance')
+    expect(parsed.openNow).toBe(true)
   })
 })

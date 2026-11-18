@@ -29,7 +29,8 @@ export default function App() {
   const [resultMeta, setResultMeta] = useState({ returnedCount: 0, hasMore: false })
   const [categories, setCategories] = useState([])
   const [selectedCategory, setSelectedCategory] = useState(initialUrlState.category)
-  const [sortByRating, setSortByRating] = useState(initialUrlState.sort === 'rating')
+  const [sort, setSort] = useState(initialUrlState.sort || '')
+  const [openNow, setOpenNow] = useState(Boolean(initialUrlState.openNow))
   // 半徑目前跟著網址走（預設 1000）；下一批接上半徑調整滑桿時直接從這裡改。
   const [radius] = useState(initialUrlState.radius)
   const [status, setStatus] = useState('idle') // idle | loading | ready | error
@@ -43,9 +44,10 @@ export default function App() {
       location,
       radius,
       category: selectedCategory,
-      sort: sortByRating ? 'rating' : '',
+      sort,
+      openNow,
     })
-  }, [location, radius, selectedCategory, sortByRating])
+  }, [location, radius, selectedCategory, sort, openNow])
 
   useEffect(() => {
     if (!location) return
@@ -72,7 +74,8 @@ export default function App() {
     try {
       const data = await fetchRestaurants({
         category: selectedCategory || undefined,
-        sort: sortByRating ? 'rating' : undefined,
+        sort: sort || undefined,
+        openNow: openNow ? true : undefined,
         lat: location.lat,
         lng: location.lng,
         radius,
@@ -95,7 +98,7 @@ export default function App() {
       setErrorMessage(err.message || '載入餐廳資料失敗')
       setStatus('error')
     }
-  }, [location, radius, selectedCategory, sortByRating])
+  }, [location, radius, selectedCategory, sort, openNow])
 
   useEffect(() => {
     loadRestaurants()
@@ -103,7 +106,7 @@ export default function App() {
 
   useEffect(() => {
     setCandidatePlaceIds(null)
-  }, [location, radius, selectedCategory, sortByRating])
+  }, [location, radius, selectedCategory, sort, openNow])
 
   const displayedRestaurants = useMemo(() => {
     if (!candidatePlaceIds) return restaurants
@@ -156,7 +159,15 @@ export default function App() {
             selectedCategory={selectedCategory}
             onChange={setSelectedCategory}
           />
-          <SortControl sortByRating={sortByRating} onToggle={setSortByRating} />
+          <SortControl sort={sort} onChange={setSort} />
+          <label className='open-now-control'>
+            <input
+              type='checkbox'
+              checked={openNow}
+              onChange={(e) => setOpenNow(e.target.checked)}
+            />
+            只看營業中
+          </label>
           <button
             type="button"
             className="draw-candidates-button"

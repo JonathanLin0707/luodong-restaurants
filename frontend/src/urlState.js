@@ -7,9 +7,10 @@ export const MIN_RADIUS_METERS = 100
 export const MAX_RADIUS_METERS = 10000
 
 export const SORT_RATING = 'rating'
+export const SORT_DISTANCE = 'distance'
 
 // 本頁會寫回網址的參數；其他參數（例如 utm_source）原樣保留，不隨條件變更被清掉。
-export const APP_QUERY_KEYS = ['lat', 'lng', 'radius', 'category', 'sort']
+export const APP_QUERY_KEYS = ['lat', 'lng', 'radius', 'category', 'sort', 'openNow']
 
 // 行政區中心點比對容錯（度）。0.001 度約 110 公尺，遠小於相鄰鄉鎮市區的距離，
 // 又足以吸收「座標寫進網址時四捨五入到小數 5 位」造成的誤差。
@@ -68,7 +69,9 @@ export function parseAppUrl(search) {
 
   const districtLabel = hasLocation ? districtLabelForCoordinates(lat, lng) : ''
   const category = hasLocation ? (params.get('category') || '').trim() : ''
-  const sort = hasLocation && (params.get('sort') || '').trim() === SORT_RATING ? SORT_RATING : ''
+  const rawSort = hasLocation ? (params.get('sort') || '').trim() : ''
+  const sort = rawSort === SORT_RATING || rawSort === SORT_DISTANCE ? rawSort : ''
+  const openNow = hasLocation && (params.get('openNow') === '1' || String(params.get('openNow') || '').toLowerCase() === 'true')
 
   return {
     location: hasLocation
@@ -79,11 +82,12 @@ export function parseAppUrl(search) {
     radius: resolveRadius(params.get('radius')),
     category,
     sort,
+    openNow,
   }
 }
 
 // 把畫面狀態轉成網址參數。預設值不寫進網址：半徑 1000、全部分類、不排序。
-export function toAppUrlParams({ location, radius, category, sort } = {}) {
+export function toAppUrlParams({ location, radius, category, sort, openNow } = {}) {
   const params = new URLSearchParams()
   if (!location || !Number.isFinite(location.lat) || !Number.isFinite(location.lng)) return params
 
@@ -97,6 +101,8 @@ export function toAppUrlParams({ location, radius, category, sort } = {}) {
   if (trimmedCategory) params.set('category', trimmedCategory)
 
   if (sort === SORT_RATING) params.set('sort', SORT_RATING)
+  if (sort === SORT_DISTANCE) params.set('sort', SORT_DISTANCE)
+  if (openNow) params.set('openNow', '1')
 
   return params
 }

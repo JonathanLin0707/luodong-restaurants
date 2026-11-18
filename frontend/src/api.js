@@ -8,10 +8,11 @@ async function handleResponse(res) {
   return res.json()
 }
 
-export async function fetchRestaurants({ category, sort, lat, lng, radius } = {}) {
+export async function fetchRestaurants({ category, sort, openNow, lat, lng, radius } = {}) {
   const params = new URLSearchParams()
   if (category) params.set('category', category)
   if (sort) params.set('sort', sort)
+  if (openNow) params.set('openNow', '1')
   if (lat != null) params.set('lat', lat)
   if (lng != null) params.set('lng', lng)
   if (radius != null) params.set('radius', radius)

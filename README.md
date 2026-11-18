@@ -49,12 +49,12 @@ FRONTEND_ORIGIN=http://localhost:5173
 
 ### API
 
-每個端點都要帶地點座標；`lat`/`lng` 必填，`radius` 選填（公尺，預設 `4000`）。同一個地點（依 `lat`/`lng`/`radius` 組成快取鍵）24 小時內會直接用快取，超過才會重新呼叫 Google Places API。
+每個端點都要帶地點座標；`lat`/`lng` 必填，`radius` 選填（公尺，預設 `1000`）。同一個地點（依 `lat`/`lng`/`radius` 組成快取鍵）24 小時內會直接用快取，超過才會重新呼叫 Google Places API。
 
 | Method | Path | 說明 |
 |---|---|---|
 | GET | `/api/health` | 健康檢查 |
-| GET | `/api/restaurants?lat=<number>&lng=<number>&radius=<meters>&category=<string>&sort=rating` | 該地點附近的餐廳清單（可用 category 篩選、sort=rating 依星數高到低排序） |
+| GET | `/api/restaurants?lat=<number>&lng=<number>&radius=<meters>&category=<string>&sort=rating|distance&openNow=1` | 該地點附近的餐廳清單（可用 category 篩選；sort=rating 依星數高到低、sort=distance 依距離由近到遠；openNow=1 只看營業中） |
 | GET | `/api/categories?lat=<number>&lng=<number>&radius=<meters>` | 該地點快取中出現過的分類清單 |
 | POST | `/api/restaurants/refresh?lat=<number>&lng=<number>&radius=<meters>` | 強制重新呼叫 Google Places API 更新該地點的快取，**會產生 Google API 費用，請手動觸發，不要排程頻繁呼叫** |
 

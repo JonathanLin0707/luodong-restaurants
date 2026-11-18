@@ -378,7 +378,7 @@ describe('App - 清單渲染（含分類篩選、排序）', () => {
     await screen.findByText('羅東夜市小吃')
     api.fetchRestaurants.mockResolvedValueOnce(apiRestaurants(sampleRestaurants))
 
-    await user.click(screen.getByRole('checkbox', { name: /依星數排序/ }))
+    await user.selectOptions(screen.getByLabelText('排序'), 'rating')
 
     await waitFor(() =>
       expect(api.fetchRestaurants).toHaveBeenLastCalledWith({
@@ -1086,7 +1086,7 @@ describe('App - 篩選條件寫入網址（重新整理不遺失、可分享）'
     await user.selectOptions(screen.getByLabelText('分類篩選'), '台式')
     await waitFor(() => expect(urlParams().get('category')).toBe('台式'))
 
-    await user.click(screen.getByRole('checkbox', { name: /依星數排序/ }))
+    await user.selectOptions(screen.getByLabelText('排序'), 'rating')
     await waitFor(() => expect(urlParams().get('sort')).toBe('rating'))
 
     // 兩個條件同時存在時，網址仍要留著座標
@@ -1095,7 +1095,7 @@ describe('App - 篩選條件寫入網址（重新整理不遺失、可分享）'
     await user.selectOptions(screen.getByLabelText('分類篩選'), '')
     await waitFor(() => expect(urlParams().get('category')).toBeNull())
 
-    await user.click(screen.getByRole('checkbox', { name: /依星數排序/ }))
+    await user.selectOptions(screen.getByLabelText('排序'), '')
     await waitFor(() => expect(urlParams().get('sort')).toBeNull())
   })
 
@@ -1164,7 +1164,7 @@ describe('App - 篩選條件寫入網址（重新整理不遺失、可分享）'
     )
 
     expect(await screen.findByLabelText('分類篩選')).toHaveValue('台式')
-    expect(screen.getByRole('checkbox', { name: /依星數排序/ })).toBeChecked()
+    expect(screen.getByLabelText('排序')).toHaveValue('rating')
   })
 
   it('重新整理（模擬 F5）後仍是同一組條件，不會跳回未選地點', async () => {
@@ -1176,7 +1176,7 @@ describe('App - 篩選條件寫入網址（重新整理不遺失、可分享）'
     await pickLocation()
     await screen.findByText('羅東夜市小吃')
     await user.selectOptions(screen.getByLabelText('分類篩選'), '台式')
-    await user.click(screen.getByRole('checkbox', { name: /依星數排序/ }))
+    await user.selectOptions(screen.getByLabelText('排序'), 'rating')
     await waitFor(() => expect(urlParams().get('sort')).toBe('rating'))
 
     const sharedSearch = window.location.search
