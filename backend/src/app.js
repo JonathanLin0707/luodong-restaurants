@@ -12,6 +12,7 @@ const placesClient = require('./placesClient');
 const cache = require('./cache');
 const { categorize, CATEGORY_ORDER } = require('./categorize');
 const { isQualifiedRestaurant } = require('./qualify');
+const { compactOpeningPeriods, resolveOpenStatus } = require('./openingHours');
 
 // Overridable in tests; defaults to the frontend's Vite build output.
 const FRONTEND_DIST_DIR = process.env.FRONTEND_DIST_DIR
@@ -98,6 +99,7 @@ function mapPlaceToRestaurant(place) {
     category: categorize(name, place.types),
     mapsUrl: mapsUrlFor(name, place.id),
     isOpen: typeof openNow === 'boolean' ? openNow : null,
+    openingPeriods: compactOpeningPeriods(place.currentOpeningHours),
     priceLevel: normalizePriceLevel(place.priceLevel),
   };
 }
@@ -131,6 +133,27 @@ function resolvePages(rawPages) {
   const pages = Number(rawPages);
   if (!Number.isFinite(pages)) return 1;
   return Math.min(3, Math.max(1, Math.trunc(pages)));
+}
+
+// openNow is a post-cache filter, so it never belongs in cacheKeyFor.
+// Only the exact values 1 / true enable it; anything else is treated as absent.
+function resolveOpenNow(rawOpenNow) {
+  if (typeof rawOpenNow !== 'string') return false;
+  const value = rawOpenNow.trim().toLowerCase();
+  return value === '1' || value === 'true';
+}
+
+function byDistanceThenRating(a, b) {
+  const hasA = Number.isFinite(a.distanceMeters);
+  const hasB = Number.isFinite(b.distanceMeters);
+  if (hasA && hasB && a.distanceMeters !== b.distanceMeters) {
+    return a.distanceMeters - b.distanceMeters;
+  }
+  if (hasA !== hasB) return hasA ? -1 : 1;
+  const ratingA = Number.isFinite(a.rating) ? a.rating : -Infinity;
+  const ratingB = Number.isFinite(b.rating) ? b.rating : -Infinity;
+  if (ratingA !== ratingB) return ratingB - ratingA;
+  return String(a.placeId).localeCompare(String(b.placeId));
 }
 
 function haversineMeters(lat1, lng1, lat2, lng2) {
@@ -287,17 +310,31 @@ app.get('/api/restaurants', async (req, res) => {
     return res.status(502).json({ error: 'Failed to fetch restaurants from Google Places API' });
   }
 
-  let list = entry.restaurants.map((r) => ({
-    ...r,
-    mapsUrl: mapsUrlFor(r.name, r.placeId),
-    distanceMeters: haversineMeters(lat, lng, r.lat, r.lng),
-  }));
+  // Open status is recomputed per request from the cached opening periods, so a
+  // 24h cache written last night does not freeze today's open/closed verdict.
+  const nowMs = Date.now();
+  const openNowOnly = resolveOpenNow(req.query.openNow);
+  let list = entry.restaurants.map((r) => {
+    const { isOpen, isOpenBasis } = resolveOpenStatus(r, nowMs);
+    return {
+      ...r,
+      mapsUrl: mapsUrlFor(r.name, r.placeId),
+      distanceMeters: haversineMeters(lat, lng, r.lat, r.lng),
+      isOpen,
+      isOpenBasis,
+    };
+  });
   list = list.filter(isQualifiedRestaurant);
+  if (openNowOnly) {
+    list = list.filter((r) => r.isOpen === true);
+  }
   if (category) {
     list = list.filter((r) => r.category === category);
   }
   if (sort === 'rating') {
     list = [...list].sort((a, b) => (b.rating ?? -Infinity) - (a.rating ?? -Infinity));
+  } else if (sort === 'distance') {
+    list = [...list].sort(byDistanceThenRating);
   }
 
   const maxItems = pages * MAX_PLACES_PER_PAGE;
