@@ -1357,3 +1357,57 @@ describe('App - API 合約：/api/restaurants 的回應形狀（契約回歸）'
     })
   })
 })
+
+describe('App - openNow 與 sort=distance 控制項 A', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('勾選只看營業中', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
+    const user = userEvent.setup()
+    render(<App />)
+    await pickLocation()
+    await screen.findByText('羅東夜市小吃')
+    api.fetchRestaurants.mockResolvedValueOnce(apiRestaurants(sampleRestaurants))
+    await user.click(screen.getByLabelText('只看營業中'))
+    await waitFor(() => expect(api.fetchRestaurants).toHaveBeenLastCalledWith({ category: undefined, sort: undefined, openNow: true, lat: DEFAULT_LOCATION.lat, lng: DEFAULT_LOCATION.lng, radius: 1000 }))
+  })
+})
+
+describe('App - openNow 與 sort=distance 控制項 B', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('選擇依距離排序', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
+    const user = userEvent.setup()
+    render(<App />)
+    await pickLocation()
+    await screen.findByText('羅東夜市小吃')
+    api.fetchRestaurants.mockResolvedValueOnce(apiRestaurants(sampleRestaurants))
+    await user.selectOptions(screen.getByLabelText('排序'), 'distance')
+    await waitFor(() => expect(api.fetchRestaurants).toHaveBeenLastCalledWith({ category: undefined, sort: 'distance', lat: DEFAULT_LOCATION.lat, lng: DEFAULT_LOCATION.lng, radius: 1000 }))
+  })
+
+  it('openNow 勾選後網址寫入 openNow=1', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
+    const user = userEvent.setup()
+    render(<App />)
+    await pickLocation()
+    await screen.findByText('羅東夜市小吃')
+    await user.click(screen.getByLabelText('只看營業中'))
+    await waitFor(() => expect(window.location.search).toContain('openNow=1'))
+  })
+
+  it('sort=distance 網址寫入 sort=distance', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
+    const user = userEvent.setup()
+    render(<App />)
+    await pickLocation()
+    await screen.findByText('羅東夜市小吃')
+    await user.selectOptions(screen.getByLabelText('排序'), 'distance')
+    await waitFor(() => expect(window.location.search).toContain('sort=distance'))
+  })
+})

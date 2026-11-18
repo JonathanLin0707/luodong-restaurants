@@ -3,6 +3,7 @@ import { useEffect, useRef } from 'react'
 const PRICE_LABELS = ['免費', '便宜', '中等', '昂貴', '非常昂貴']
 
 function openStatusInfo(isOpenBasis, isOpen) {
+  if (isOpen == null) return null
   if (isOpenBasis === 'schedule') {
     return isOpen ? { text: '營業中', tooltip: '依營業時段判定', open: true }
                   : { text: '休息中', tooltip: '依營業時段判定', open: false }
