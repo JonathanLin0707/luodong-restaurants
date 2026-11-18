@@ -25,6 +25,8 @@ export default function App() {
   )
   const [location, setLocation] = useState(initialUrlState.location)
   const [restaurants, setRestaurants] = useState([])
+  // /api/restaurants 的回傳筆數與是否有下一頁（returnedCount / hasMore）：先存起來，之後接「載入更多」時直接用。
+  const [resultMeta, setResultMeta] = useState({ returnedCount: 0, hasMore: false })
   const [categories, setCategories] = useState([])
   const [selectedCategory, setSelectedCategory] = useState(initialUrlState.category)
   const [sortByRating, setSortByRating] = useState(initialUrlState.sort === 'rating')
@@ -75,7 +77,19 @@ export default function App() {
         lng: location.lng,
         radius,
       })
-      setRestaurants(data)
+      // c0ee72c 起 /api/restaurants 回傳 { restaurants, returnedCount, hasMore, count } 物件，
+      // 清單一律取 data.restaurants；形狀不對時退回空清單並走錯誤狀態，不會白屏。
+      const list = Array.isArray(data?.restaurants) ? data.restaurants : []
+      if (!Array.isArray(data?.restaurants)) {
+        setErrorMessage('餐廳資料格式異常，請稍後再試')
+        setStatus('error')
+        return
+      }
+      setRestaurants(list)
+      setResultMeta({
+        returnedCount: data.returnedCount ?? list.length,
+        hasMore: Boolean(data.hasMore),
+      })
       setStatus('ready')
     } catch (err) {
       setErrorMessage(err.message || '載入餐廳資料失敗')

@@ -114,6 +114,19 @@ const sampleRestaurants = [
 
 const sampleCategories = ['小吃', '台式']
 
+// 後端 c0ee72c 起，/api/restaurants 回傳的是物件不是陣列：
+// { restaurants, returnedCount, hasMore, count }。
+// 所有 fetchRestaurants 的 mock 一律用這個 helper 包出真實形狀，
+// 這樣 API 合約再改形狀時，測試會直接爆掉，不會出現測試全綠、畫面白屏的狀況。
+function apiRestaurants(list) {
+  return {
+    restaurants: list,
+    returnedCount: list.length,
+    hasMore: false,
+    count: list.length,
+  }
+}
+
 const manyRestaurants = Array.from({ length: 7 }, (_, i) => ({
   placeId: `c${i + 1}`,
   name: `候選店${i + 1}`,
@@ -159,7 +172,7 @@ describe('App - 初始畫面（尚未選擇地點）', () => {
 describe('App - 透過地點自動完成選擇地點後載入附近餐廳', () => {
   it('選到地點後才會帶正確 lat/lng/radius 打 API', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
 
     render(<App />)
     await pickLocation()
@@ -186,7 +199,7 @@ describe('App - 透過地點自動完成選擇地點後載入附近餐廳', () =
 
   it('選到沒有 geometry 的結果時會忽略，保留原本地點不變', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
 
     render(<App />)
     await pickLocation()
@@ -211,7 +224,7 @@ describe('App - 透過地點自動完成選擇地點後載入附近餐廳', () =
 describe('App - 使用目前位置', () => {
   it('允許定位時會用取得的座標載入附近餐廳', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
     navigator.geolocation.getCurrentPosition.mockImplementation((success) => {
       success({ coords: { latitude: 25.03, longitude: 121.56 } })
     })
@@ -248,7 +261,7 @@ describe('App - 使用目前位置', () => {
     expect(api.fetchRestaurants).not.toHaveBeenCalled()
 
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
     await pickLocation()
 
     expect(await screen.findByText('羅東夜市小吃')).toBeInTheDocument()
@@ -285,13 +298,13 @@ describe('App - 清單渲染（含分類篩選、排序）', () => {
     await pickLocation()
 
     expect(screen.getByText('載入中…')).toBeInTheDocument()
-    resolveFetch(sampleRestaurants)
+    resolveFetch(apiRestaurants(sampleRestaurants))
     await waitFor(() => expect(screen.getByText('羅東夜市小吃')).toBeInTheDocument())
   })
 
   it('成功取得資料後渲染所有餐廳與分類標籤', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
 
     render(<App />)
     await pickLocation()
@@ -306,7 +319,7 @@ describe('App - 清單渲染（含分類篩選、排序）', () => {
 
   it('清單為空時顯示空狀態訊息', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue([])
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants([]))
 
     render(<App />)
     await pickLocation()
@@ -323,7 +336,7 @@ describe('App - 清單渲染（含分類篩選、排序）', () => {
 
     expect(await screen.findByText('載入餐廳資料失敗。')).toBeInTheDocument()
 
-    api.fetchRestaurants.mockResolvedValueOnce(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValueOnce(apiRestaurants(sampleRestaurants))
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: '重試' }))
 
@@ -332,14 +345,14 @@ describe('App - 清單渲染（含分類篩選、排序）', () => {
 
   it('選擇分類後會帶 category 參數重新查詢', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
 
     const user = userEvent.setup()
     render(<App />)
     await pickLocation()
 
     await screen.findByText('羅東夜市小吃')
-    api.fetchRestaurants.mockResolvedValueOnce([sampleRestaurants[1]])
+    api.fetchRestaurants.mockResolvedValueOnce(apiRestaurants([sampleRestaurants[1]]))
 
     await user.selectOptions(screen.getByLabelText('分類篩選'), '台式')
 
@@ -356,14 +369,14 @@ describe('App - 清單渲染（含分類篩選、排序）', () => {
 
   it('勾選依星數排序後會帶 sort=rating 重新查詢', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
 
     const user = userEvent.setup()
     render(<App />)
     await pickLocation()
 
     await screen.findByText('羅東夜市小吃')
-    api.fetchRestaurants.mockResolvedValueOnce(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValueOnce(apiRestaurants(sampleRestaurants))
 
     await user.click(screen.getByRole('checkbox', { name: /依星數排序/ }))
 
@@ -382,7 +395,7 @@ describe('App - 清單渲染（含分類篩選、排序）', () => {
 describe('App - 清單與地圖選取連動', () => {
   it('點擊清單項目會選取該餐廳、讓地圖置中並觸發 marker 動畫', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
 
     const user = userEvent.setup()
     render(<App />)
@@ -409,7 +422,7 @@ describe('App - 清單與地圖選取連動', () => {
 
   it('按 Enter 鍵也能觸發選取（鍵盤可操作性）', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
 
     const user = userEvent.setup()
     render(<App />)
@@ -429,7 +442,7 @@ describe('App - 清單與地圖選取連動', () => {
 
   it('點擊地圖上的 marker 會同步清單的選取高亮', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
 
     render(<App />)
     await pickLocation()
@@ -451,7 +464,7 @@ describe('App - 清單與地圖選取連動', () => {
 
   it('點擊地圖上的 marker 會讓清單自動捲動到對應項目', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
 
     render(<App />)
     await pickLocation()
@@ -472,7 +485,7 @@ describe('App - 清單與地圖選取連動', () => {
 
   it('重複點擊同一筆餐廳會重新觸發一次視覺提示', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
 
     const user = userEvent.setup()
     render(<App />)
@@ -492,7 +505,7 @@ describe('App - 清單與地圖選取連動', () => {
 
   it('切換分類篩選後，若原選取的餐廳不在新結果中，選取狀態會被清除', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
 
     const user = userEvent.setup()
     render(<App />)
@@ -502,7 +515,7 @@ describe('App - 清單與地圖選取連動', () => {
     await waitFor(() => expect(createdMarkers).toHaveLength(sampleRestaurants.length))
     await user.click(screen.getByRole('button', { name: '在地圖上顯示 羅東夜市小吃 的位置' }))
 
-    api.fetchRestaurants.mockResolvedValueOnce([sampleRestaurants[1]])
+    api.fetchRestaurants.mockResolvedValueOnce(apiRestaurants([sampleRestaurants[1]]))
     await user.selectOptions(screen.getByLabelText('分類篩選'), '台式')
 
     await waitFor(() => expect(screen.queryByText('羅東夜市小吃')).not.toBeInTheDocument())
@@ -513,7 +526,7 @@ describe('App - 清單與地圖選取連動', () => {
 describe('App - 開啟 Google 地圖（次要操作）', () => {
   it('點擊「在 Google 地圖開啟」按鈕仍會用 mapsUrl 開新分頁', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
 
     const user = userEvent.setup()
     render(<App />)
@@ -532,7 +545,7 @@ describe('App - 開啟 Google 地圖（次要操作）', () => {
   it('地圖載入失敗時，點擊清單項目不會報錯', async () => {
     mapsLoader.loadGoogleMaps.mockRejectedValue(new Error('load failed'))
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
     navigator.geolocation.getCurrentPosition.mockImplementation((success) => {
       success({ coords: { latitude: DEFAULT_LOCATION.lat, longitude: DEFAULT_LOCATION.lng } })
     })
@@ -555,7 +568,7 @@ describe('App - 開啟 Google 地圖（次要操作）', () => {
 describe('App - 抽 5 家候選', () => {
   it('點擊「抽 5 家」只顯示抽出的 5 家候選', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(manyRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(manyRestaurants))
     const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0)
 
     const user = userEvent.setup()
@@ -577,7 +590,7 @@ describe('App - 抽 5 家候選', () => {
 
   it('抽 5 家後，地圖只顯示候選的 5 個標記（與清單一致）', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(manyRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(manyRestaurants))
     const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0)
 
     const user = userEvent.setup()
@@ -602,7 +615,7 @@ describe('App - 抽 5 家候選', () => {
 
   it('候選不足 5 家時顯示提示並顯示全部候選、不出錯', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
     const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0)
 
     const user = userEvent.setup()
@@ -620,7 +633,7 @@ describe('App - 抽 5 家候選', () => {
 
   it('「重新抽」會產生不同的候選組合', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(manyRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(manyRestaurants))
     const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0)
 
     const user = userEvent.setup()
@@ -643,7 +656,7 @@ describe('App - 抽 5 家候選', () => {
 
   it('「顯示全部」會還原完整清單並隱藏候選橫幅', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(manyRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(manyRestaurants))
     const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0)
 
     const user = userEvent.setup()
@@ -664,7 +677,7 @@ describe('App - 抽 5 家候選', () => {
 
   it('切換分類篩選會自動清除候選狀態（回到完整清單，不會自動重新抽）', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
     const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0)
 
     const user = userEvent.setup()
@@ -675,7 +688,7 @@ describe('App - 抽 5 家候選', () => {
     await user.click(screen.getByRole('button', { name: '抽 5 家 🎲' }))
     expect(screen.getByText(/今天的候選/)).toBeInTheDocument()
 
-    api.fetchRestaurants.mockResolvedValueOnce([sampleRestaurants[1]])
+    api.fetchRestaurants.mockResolvedValueOnce(apiRestaurants([sampleRestaurants[1]]))
     await user.selectOptions(screen.getByLabelText('分類篩選'), '台式')
 
     await waitFor(() => expect(screen.queryByText(/今天的候選/)).not.toBeInTheDocument())
@@ -686,7 +699,7 @@ describe('App - 抽 5 家候選', () => {
 
   it('換地點會把「抽 5 家」候選重置', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(manyRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(manyRestaurants))
     const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0)
 
     const user = userEvent.setup()
@@ -698,7 +711,7 @@ describe('App - 抽 5 家候選', () => {
     expect(screen.getByText(/今天的候選/)).toBeInTheDocument()
 
     const otherLocation = { lat: 25.03, lng: 121.56, label: '台北市信義區' }
-    api.fetchRestaurants.mockResolvedValueOnce(manyRestaurants)
+    api.fetchRestaurants.mockResolvedValueOnce(apiRestaurants(manyRestaurants))
     await pickLocation(otherLocation)
 
     await waitFor(() => expect(screen.queryByText(/今天的候選/)).not.toBeInTheDocument())
@@ -719,7 +732,7 @@ describe('App - 抽 5 家候選', () => {
 describe('App - 換地點後重置分類篩選', () => {
   it('新地點的分類清單沒有原本選的分類時，自動重置為全部分類並正常顯示新地點的餐廳', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
 
     const user = userEvent.setup()
     render(<App />)
@@ -732,7 +745,7 @@ describe('App - 換地點後重置分類篩選', () => {
     const otherLocation = { lat: 25.03, lng: 121.56, label: '台北市信義區' }
     const otherRestaurants = [{ ...sampleRestaurants[0], placeId: 'o1', category: '咖啡廳' }]
     api.fetchCategories.mockResolvedValueOnce(['咖啡廳'])
-    api.fetchRestaurants.mockResolvedValue(otherRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(otherRestaurants))
 
     await pickLocation(otherLocation)
 
@@ -743,7 +756,7 @@ describe('App - 換地點後重置分類篩選', () => {
 
   it('即使新地點分類清單還沒載入完成，換地點也會立刻重置分類篩選為全部', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
 
     const user = userEvent.setup()
     render(<App />)
@@ -771,7 +784,7 @@ describe('App - 換地點後重置分類篩選', () => {
 
   it('換到有同名分類的新地點時，換地點後清單會以全部分類重新查詢，不會沿用舊分類篩選', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
 
     const user = userEvent.setup()
     render(<App />)
@@ -788,7 +801,7 @@ describe('App - 換地點後重置分類篩選', () => {
     const otherLocation = { lat: 25.03, lng: 121.56, label: '台北市信義區' }
     const otherRestaurants = [{ ...sampleRestaurants[1], placeId: 'o2', category: '台式' }]
     api.fetchCategories.mockResolvedValueOnce(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(otherRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(otherRestaurants))
 
     await pickLocation(otherLocation)
 
@@ -831,7 +844,7 @@ describe('App - 地圖以所選地點為中心', () => {
       }),
     )
 
-    resolveFetch(sampleRestaurants)
+    resolveFetch(apiRestaurants(sampleRestaurants))
   })
 })
 
@@ -864,7 +877,7 @@ describe('App - 地點本地搜尋（不依賴 Google Places 自動完成）', (
 
   it('用滑鼠點選下拉選項會帶正確座標載入餐廳，並把選取結果顯示在輸入框', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
 
     const user = userEvent.setup()
     render(<App />)
@@ -886,7 +899,7 @@ describe('App - 地點本地搜尋（不依賴 Google Places 自動完成）', (
 
   it('用鍵盤（↓ 移動、Enter 選取）也能選到地點', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
 
     const user = userEvent.setup()
     render(<App />)
@@ -932,7 +945,7 @@ describe('App - 地點本地搜尋（不依賴 Google Places 自動完成）', (
       new Error('Quota exceeded for quota metric AutocompletePlacesRequest'),
     )
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
 
     const user = userEvent.setup()
     render(<App />)
@@ -1045,7 +1058,7 @@ function urlParams() {
 describe('App - 篩選條件寫入網址（重新整理不遺失、可分享）', () => {
   it('選好地點後就把 lat/lng 寫進網址，且不把預設半徑一起寫進去', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
 
     render(<App />)
     expect(window.location.search).toBe('')
@@ -1063,7 +1076,7 @@ describe('App - 篩選條件寫入網址（重新整理不遺失、可分享）'
 
   it('分類與排序會寫進網址，取消後也從網址移除', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
 
     const user = userEvent.setup()
     render(<App />)
@@ -1088,7 +1101,7 @@ describe('App - 篩選條件寫入網址（重新整理不遺失、可分享）'
 
   it('用 replaceState 更新網址，不會每一步篩選都多一筆瀏覽器上一頁紀錄', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
 
     const pushState = vi.spyOn(window.history, 'pushState')
     const replaceState = vi.spyOn(window.history, 'replaceState')
@@ -1109,7 +1122,7 @@ describe('App - 篩選條件寫入網址（重新整理不遺失、可分享）'
 
   it('網址裡其他無關參數（例如 utm_source）不會被篩選動作清掉', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
     setUrl('utm_source=line')
 
     render(<App />)
@@ -1122,7 +1135,7 @@ describe('App - 篩選條件寫入網址（重新整理不遺失、可分享）'
 
   it('分享連結一開啟就帶回地點、半徑、分類與排序，也還原畫面欄位', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
     setUrl(
       `lat=${LUODONG.lat}&lng=${LUODONG.lng}&radius=6000&category=${encodeURIComponent('台式')}&sort=rating`,
     )
@@ -1156,7 +1169,7 @@ describe('App - 篩選條件寫入網址（重新整理不遺失、可分享）'
 
   it('重新整理（模擬 F5）後仍是同一組條件，不會跳回未選地點', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
 
     const user = userEvent.setup()
     const first = render(<App />)
@@ -1190,7 +1203,7 @@ describe('App - 篩選條件寫入網址（重新整理不遺失、可分享）'
 
   it('網址 radius 超出 100–10000 或不是數字時，回退預設 4000 並把網址修成乾淨值', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
     setUrl('lat=24.6778&lng=121.7684&radius=99999')
 
     render(<App />)
@@ -1227,7 +1240,7 @@ describe('App - 篩選條件寫入網址（重新整理不遺失、可分享）'
 
   it('換地點後網址換成新座標，舊分類條件不會跟著帶過去', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
     setUrl('lat=24.6778&lng=121.7684&category=' + encodeURIComponent('台式'))
 
     const user = userEvent.setup()
@@ -1245,5 +1258,102 @@ describe('App - 篩選條件寫入網址（重新整理不遺失、可分享）'
     await waitFor(() => expect(urlParams().get('lat')).toBe('24.18309'))
     expect(urlParams().get('category')).toBeNull()
     expect(urlParams().get('lng')).toBe(String(Number(xitun.lng.toFixed(5))))
+  })
+})
+
+describe('App - API 合約：/api/restaurants 的回應形狀（契約回歸）', () => {
+  // 回放的後端真實回應樣板，形状取自 backend/src/app.js 的 res.status(200).json({...})。
+  const backendShapeRestaurants = [
+    {
+      placeId: 'p1',
+      name: '羅東夜市小吃',
+      rating: 4.5,
+      userRatingsTotal: 120,
+      address: '宜蘭縣羅東鎮民權路1號',
+      lat: 24.678,
+      lng: 121.768,
+      category: '小吃',
+      mapsUrl: 'https://maps.google.com/?cid=p1',
+      isOpen: true,
+      priceLevel: 2,
+      distanceMeters: 220,
+    },
+    {
+      placeId: 'p2',
+      name: '林場肉羹',
+      rating: 4.2,
+      userRatingsTotal: 80,
+      address: '宜蘭縣羅東鎮中正北路2號',
+      lat: 24.679,
+      lng: 121.769,
+      category: '台式',
+      mapsUrl: 'https://maps.google.com/?cid=p2',
+      isOpen: false,
+      priceLevel: 1,
+      distanceMeters: 350,
+    },
+  ]
+
+  it('後端回傳 { restaurants, returnedCount, hasMore, count } 物件時，清單正常渲染，不會白屏', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue({
+      restaurants: backendShapeRestaurants,
+      returnedCount: 2,
+      hasMore: true,
+      count: 2,
+    })
+
+    render(<App />)
+    await pickLocation()
+
+    expect(await screen.findByText('羅東夜市小吃')).toBeInTheDocument()
+    expect(screen.getByText('林場肉羹')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.queryByText('載入中…')).not.toBeInTheDocument()
+  })
+
+  it('把整個回應物件當成清單塞進來（舊前端寫法）會立刻被抓到：不會渲染任何餐廳', async () => {
+    // 這條就是 85105c0 白屏（e.map is not a function）的回归锚点：
+    // 前端若把整個物件當陣列用，這條會紅，不會像之前一樣測試全綠、實測白屏。
+    const wholeResponse = {
+      restaurants: backendShapeRestaurants,
+      returnedCount: 2,
+      hasMore: false,
+      count: 2,
+    }
+
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValueOnce(wholeResponse)
+
+    render(<App />)
+    await pickLocation()
+
+    // 正確前端：讀 data.restaurants，兩家都渲染出來，而且不會有錯誤提示。
+    expect(await screen.findByText('羅東夜市小吃')).toBeInTheDocument()
+    expect(screen.getByText('林場肉羹')).toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('回應完全缺少 restaurants 陣列時走錯誤狀態，不會白屏也不寫入壞資料', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValueOnce({ returnedCount: 0, hasMore: false, count: 0 })
+
+    render(<App />)
+    await pickLocation()
+
+    expect(await screen.findByText('餐廳資料格式異常，請稍後再試')).toBeInTheDocument()
+    expect(screen.queryByText('載入中…')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '重試' })).toBeInTheDocument()
+  })
+
+  it('apiRestaurants helper 與後端實際回傳形狀一致，防止 mock 又跑回陣列合約', () => {
+    expect(Object.keys(apiRestaurants([])).sort()).toEqual(
+      ['count', 'hasMore', 'restaurants', 'returnedCount'].sort(),
+    )
+    expect(apiRestaurants(backendShapeRestaurants)).toMatchObject({
+      restaurants: backendShapeRestaurants,
+      returnedCount: 2,
+      count: 2,
+    })
   })
 })
