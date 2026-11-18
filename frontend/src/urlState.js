@@ -1,8 +1,8 @@
 import districts from './data/taiwan-districts.json'
 
 // 與 backend/src/app.js 的 resolveRadius 保持同一組界線與預設值：
-// 後端超出範圍會退回預設 4000，前端照做，這樣網址寫出去的值一定就是實際查詢的值。
-export const DEFAULT_RADIUS_METERS = 4000
+// 後端超出範圍會退回預設 1000，前端照做，這樣網址寫出去的值一定就是實際查詢的值。
+export const DEFAULT_RADIUS_METERS = 1000
 export const MIN_RADIUS_METERS = 100
 export const MAX_RADIUS_METERS = 10000
 
@@ -31,7 +31,7 @@ function parseCoordinate(raw, min, max) {
   return value
 }
 
-// 半徑規則刻意與後端 resolveRadius 一致：不是有限數字、或超出 100–10000，就回預設 4000。
+// 半徑規則刻意與後端 resolveRadius 一致：不是有限數字、或超出 100–10000，就回預設 1000。
 export function resolveRadius(rawRadius) {
   if (rawRadius === null || rawRadius === undefined) return DEFAULT_RADIUS_METERS
   const text = String(rawRadius).trim()
@@ -82,7 +82,7 @@ export function parseAppUrl(search) {
   }
 }
 
-// 把畫面狀態轉成網址參數。預設值不寫進網址：半徑 4000、全部分類、不排序。
+// 把畫面狀態轉成網址參數。預設值不寫進網址：半徑 1000、全部分類、不排序。
 export function toAppUrlParams({ location, radius, category, sort } = {}) {
   const params = new URLSearchParams()
   if (!location || !Number.isFinite(location.lat) || !Number.isFinite(location.lng)) return params

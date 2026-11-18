@@ -181,7 +181,7 @@ describe('App - 透過地點自動完成選擇地點後載入附近餐廳', () =
       expect(api.fetchCategories).toHaveBeenCalledWith({
         lat: DEFAULT_LOCATION.lat,
         lng: DEFAULT_LOCATION.lng,
-        radius: 4000,
+        radius: 1000,
       }),
     )
     await waitFor(() =>
@@ -190,7 +190,7 @@ describe('App - 透過地點自動完成選擇地點後載入附近餐廳', () =
         sort: undefined,
         lat: DEFAULT_LOCATION.lat,
         lng: DEFAULT_LOCATION.lng,
-        radius: 4000,
+        radius: 1000,
       }),
     )
     expect(await screen.findByText('羅東夜市小吃')).toBeInTheDocument()
@@ -239,7 +239,7 @@ describe('App - 使用目前位置', () => {
         sort: undefined,
         lat: 25.03,
         lng: 121.56,
-        radius: 4000,
+        radius: 1000,
       }),
     )
     expect(await screen.findByText('羅東夜市小吃')).toBeInTheDocument()
@@ -362,7 +362,7 @@ describe('App - 清單渲染（含分類篩選、排序）', () => {
         sort: undefined,
         lat: DEFAULT_LOCATION.lat,
         lng: DEFAULT_LOCATION.lng,
-        radius: 4000,
+        radius: 1000,
       }),
     )
   })
@@ -386,7 +386,7 @@ describe('App - 清單渲染（含分類篩選、排序）', () => {
         sort: 'rating',
         lat: DEFAULT_LOCATION.lat,
         lng: DEFAULT_LOCATION.lng,
-        radius: 4000,
+        radius: 1000,
       }),
     )
   })
@@ -721,7 +721,7 @@ describe('App - 抽 5 家候選', () => {
         sort: undefined,
         lat: otherLocation.lat,
         lng: otherLocation.lng,
-        radius: 4000,
+        radius: 1000,
       }),
     )
 
@@ -1195,13 +1195,13 @@ describe('App - 篩選條件寫入網址（重新整理不遺失、可分享）'
         sort: 'rating',
         lat: DEFAULT_LOCATION.lat,
         lng: DEFAULT_LOCATION.lng,
-        radius: 4000,
+        radius: 1000,
       }),
     )
     expect(screen.queryByText('請先選擇地點，才能顯示附近餐廳。')).not.toBeInTheDocument()
   })
 
-  it('網址 radius 超出 100–10000 或不是數字時，回退預設 4000 並把網址修成乾淨值', async () => {
+  it('網址 radius 超出 100–10000 或不是數字時，回退預設 1000 並把網址修成乾淨值', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
     api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
     setUrl('lat=24.6778&lng=121.7684&radius=99999')
@@ -1214,7 +1214,7 @@ describe('App - 篩選條件寫入網址（重新整理不遺失、可分享）'
         sort: undefined,
         lat: 24.6778,
         lng: 121.7684,
-        radius: 4000,
+        radius: 1000,
       }),
     )
     await waitFor(() => expect(urlParams().get('radius')).toBeNull())

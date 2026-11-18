@@ -30,7 +30,7 @@ export default function App() {
   const [categories, setCategories] = useState([])
   const [selectedCategory, setSelectedCategory] = useState(initialUrlState.category)
   const [sortByRating, setSortByRating] = useState(initialUrlState.sort === 'rating')
-  // 半徑目前跟著網址走（預設 4000）；下一批接上半徑調整滑桿時直接從這裡改。
+  // 半徑目前跟著網址走（預設 1000）；下一批接上半徑調整滑桿時直接從這裡改。
   const [radius] = useState(initialUrlState.radius)
   const [status, setStatus] = useState('idle') // idle | loading | ready | error
   const [errorMessage, setErrorMessage] = useState('')

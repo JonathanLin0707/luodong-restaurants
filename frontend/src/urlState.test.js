@@ -71,8 +71,16 @@ describe('urlState - 半徑', () => {
     expect(resolveRadius(raw)).toBe(expected)
   })
 
-  it.each(['', ' ', 'abc', '99', '10001', '-500', null, undefined])('不合法半徑 %s 退回預設 4000', (raw) => {
+  it.each(['', ' ', 'abc', '99', '10001', '-500', null, undefined])('不合法半徑 %s 退回預設 1000', (raw) => {
     expect(resolveRadius(raw)).toBe(DEFAULT_RADIUS_METERS)
+  })
+
+  it('舊連結帶 radius=4000 仍保留並生效（不被新預設值 1000 覆寫）', () => {
+    expect(resolveRadius('4000')).toBe(4000)
+    const state = parseAppUrl('?lat=24.6778&lng=121.7684&radius=4000')
+    expect(state.radius).toBe(4000)
+    const params = toAppUrlParams({ location: { lat: 24.6778, lng: 121.7684 }, radius: 4000, category: '', sort: '' })
+    expect(params.get('radius')).toBe('4000')
   })
 })
 
