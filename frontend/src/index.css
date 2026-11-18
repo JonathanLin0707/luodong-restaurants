@@ -328,3 +328,38 @@ input:focus-visible {
 .empty-state {
   color: #666;
 }
+
+.open-status {
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.open-status-open {
+  background: #e6f4ea;
+  color: #1e7e34;
+}
+
+.open-status-closed {
+  background: #f1f1f1;
+  color: #666;
+}
+
+.restaurant-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  align-items: center;
+}
+
+.price-level {
+  color: #b06000;
+  font-weight: 600;
+}
+
+.distance {
+  color: #555;
+  font-size: 0.85rem;
+}
