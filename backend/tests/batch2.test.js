@@ -319,3 +319,105 @@ describe('GET /api/categories: ignores openNow', () => {
     expect(res.body).toEqual(['海鮮']);
   });
 });
+
+
+describe('GET /api/restaurants: multi-value category and minRating', () => {
+  const weekday11to21 = [1, 2, 3, 4, 5].map((day) => ({ open: { day, hour: 11, minute: 0 }, close: { day, hour: 21, minute: 0 } }));
+
+  beforeEach(() => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date(TUE_1530));
+    app.__setCacheForTest({});
+    jest.clearAllMocks();
+  });
+
+  it('category unions comma-separated values, trims whitespace and ignores empty tokens', async () => {
+    seed([
+      restaurant('japan', { category: '日式', rating: 4.2 }),
+      restaurant('hotpot', { category: '火鍋', rating: 4.5 }),
+      restaurant('snack', { category: '小吃', rating: 4.0 }),
+    ]);
+    const union = await request(app)
+      .get('/api/restaurants')
+      .query({ ...CENTER, category: ' 日式 , 火鍋 ,,' });
+    expect(union.body.restaurants.map((r) => r.placeId).sort()).toEqual(['hotpot', 'japan']);
+    expect(union.body.count).toBe(2);
+    expect(union.body.returnedCount).toBe(2);
+
+    // A single value keeps the original exact-match behaviour.
+    const single = await request(app)
+      .get('/api/restaurants')
+      .query({ ...CENTER, category: '小吃' });
+    expect(single.body.restaurants.map((r) => r.placeId)).toEqual(['snack']);
+    expect(single.body.count).toBe(1);
+    expect(placesClient.fetchNearbyRestaurants).not.toHaveBeenCalled();
+  });
+
+  it('minRating=4 keeps only rating>=4 and never returns a null rating', async () => {
+    seed([
+      restaurant('high', { rating: 4.8 }),
+      restaurant('boundary', { rating: 4.0 }),
+      restaurant('below', { rating: 3.9 }),
+      restaurant('nullish', { rating: null }),
+    ]);
+    const res = await request(app).get('/api/restaurants').query({ ...CENTER, minRating: 4 });
+    expect(res.body.restaurants.map((r) => r.placeId).sort()).toEqual(['boundary', 'high']);
+    expect(res.body.restaurants.every((r) => r.rating !== null && r.rating >= 4)).toBe(true);
+    expect(res.body.count).toBe(2);
+    expect(res.body.returnedCount).toBe(2);
+  });
+
+  it('treats minRating 0, negative, over 5, non-numeric and blank like not passing it', async () => {
+    seed([restaurant('lowish', { rating: 3.2 }), restaurant('high', { rating: 4.6 })]);
+    for (const value of ['0', '-1', '5.1', 'abc', '', ' ', 'null']) {
+      const res = await request(app).get('/api/restaurants').query({ ...CENTER, minRating: value });
+      expect(res.body.restaurants.map((r) => r.placeId).sort()).toEqual(['high', 'lowish']);
+    }
+  });
+
+  it('stacks category, minRating, openNow and sort=distance without changing any predicate', async () => {
+    seed([
+      restaurant('openSnackHigh', { category: '小吃', rating: 4.5, openingPeriods: weekday11to21, lat: 24.6778 }),
+      restaurant('openSnackLow', { category: '小吃', rating: 3.9, openingPeriods: weekday11to21, lat: 24.679 }),
+      restaurant('closedHotpotHigh', { category: '火鍋', rating: 4.7, openingPeriods: [{ open: { day: 3, hour: 1, minute: 0 }, close: { day: 3, hour: 2, minute: 0 } }], lat: 24.6778 }),
+      restaurant('openHotpotHigh', { category: '火鍋', rating: 4.6, openingPeriods: weekday11to21, lat: 24.68 }),
+    ]);
+    const res = await request(app)
+      .get('/api/restaurants')
+      .query({ ...CENTER, category: '小吃,火鍋', minRating: 4, openNow: 1, sort: 'distance' });
+    expect(res.body.restaurants.map((r) => r.placeId)).toEqual(['openSnackHigh', 'openHotpotHigh']);
+    expect(res.body.count).toBe(2);
+  });
+
+  it('keeps single-value category plus sort=rating unchanged', async () => {
+    seed([
+      restaurant('a', { category: '日式', rating: 4.2 }),
+      restaurant('b', { category: '日式', rating: 4.8 }),
+      restaurant('c', { category: '火鍋', rating: 4.9 }),
+    ]);
+    const res = await request(app)
+      .get('/api/restaurants')
+      .query({ ...CENTER, category: '日式', sort: 'rating' });
+    expect(res.body.restaurants.map((r) => r.placeId)).toEqual(['b', 'a']);
+    expect(res.body.count).toBe(2);
+  });
+
+  it('category and minRating never enter the cache key: one Places call answers every combination', async () => {
+    placesClient.fetchNearbyRestaurants.mockResolvedValue({
+      places: [makePlace('p1', { rating: 4.8 }), makePlace('p2', { rating: 3.2 })],
+      nextPageToken: undefined,
+    });
+    app.__setCacheForTest({});
+    const combos = [
+      [{ category: '其他' }, ['p1', 'p2']],
+      [{ minRating: 4 }, ['p1']],
+      [{ category: '其他,其他', minRating: 4, sort: 'rating' }, ['p1']],
+      [{ category: '', minRating: 0, sort: 'distance' }, ['p1', 'p2']],
+    ];
+    for (const [query, expected] of combos) {
+      const res = await request(app).get('/api/restaurants').query({ ...CENTER, ...query });
+      expect(res.body.restaurants.map((r) => r.placeId)).toEqual(expected);
+    }
+    expect(placesClient.fetchNearbyRestaurants).toHaveBeenCalledTimes(1);
+  });
+});

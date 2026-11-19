@@ -32,6 +32,7 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const MAX_CACHE_ENTRIES = 20;
 const SCHEMA_VERSION = 2;
 const MAX_PLACES_PER_PAGE = 20;
+const MAX_RATING = 5;
 const REFRESH_COOLDOWN_MS = 5 * 60 * 1000;
 
 const app = express();
@@ -135,8 +136,32 @@ function resolvePages(rawPages) {
   return Math.min(3, Math.max(1, Math.trunc(pages)));
 }
 
-// openNow is a post-cache filter, so it never belongs in cacheKeyFor.
-// Only the exact values 1 / true enable it; anything else is treated as absent.
+// minRating is validated exactly like radius: a non-number, <= 0 or > 5 is
+// treated as absent instead of erroring, so a bad query never breaks the list.
+function resolveMinRating(rawMinRating) {
+  if (rawMinRating === undefined) return null;
+  const rating = Number(rawMinRating);
+  if (!Number.isFinite(rating) || rating <= 0 || rating > MAX_RATING) {
+    return null;
+  }
+  return rating;
+}
+
+// category accepts a single value or a comma-separated OR list. It is a
+// post-cache filter, so it never belongs in cacheKeyFor. Whitespace is trimmed
+// and empty tokens are dropped, so "a,,b" and "a, b" mean the same thing and a
+// blank value behaves exactly like not passing the parameter at all.
+function resolveCategories(rawCategory) {
+  const values = Array.isArray(rawCategory) ? rawCategory : [rawCategory];
+  return values
+    .flatMap((value) => (typeof value === 'string' ? value.split(',') : []))
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+}
+
+// openNow, category and minRating are post-cache filters, so none of them
+// belongs in cacheKeyFor. Only the exact values 1 / true enable openNow;
+// anything else is treated as absent.
 function resolveOpenNow(rawOpenNow) {
   if (typeof rawOpenNow !== 'string') return false;
   const value = rawOpenNow.trim().toLowerCase();
@@ -300,6 +325,8 @@ app.get('/api/restaurants', async (req, res) => {
   }
   const radius = resolveRadius(req.query.radius);
   const pages = resolvePages(req.query.pages);
+  const categories = resolveCategories(category);
+  const minRating = resolveMinRating(req.query.minRating);
   const key = cacheKeyFor(lat, lng, radius, pages);
 
   let entry;
@@ -328,8 +355,12 @@ app.get('/api/restaurants', async (req, res) => {
   if (openNowOnly) {
     list = list.filter((r) => r.isOpen === true);
   }
-  if (category) {
-    list = list.filter((r) => r.category === category);
+  if (categories.length > 0) {
+    const wanted = new Set(categories);
+    list = list.filter((r) => wanted.has(r.category));
+  }
+  if (minRating !== null) {
+    list = list.filter((r) => r.rating != null && r.rating >= minRating);
   }
   if (sort === 'rating') {
     list = [...list].sort((a, b) => (b.rating ?? -Infinity) - (a.rating ?? -Infinity));
