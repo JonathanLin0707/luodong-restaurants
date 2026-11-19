@@ -4,7 +4,7 @@ import RestaurantList from './components/RestaurantList.jsx'
 import CategoryFilter from './components/CategoryFilter.jsx'
 import SortControl from './components/SortControl.jsx'
 import LocationPicker from './components/LocationPicker.jsx'
-import { fetchRestaurants, fetchCategories } from './api.js'
+import { fetchRestaurants } from './api.js'
 import { parseAppUrl, syncAppUrl } from './urlState.js'
 
 const CANDIDATE_COUNT = 5
@@ -27,10 +27,10 @@ export default function App() {
   const [restaurants, setRestaurants] = useState([])
   // /api/restaurants 的回傳筆數與是否有下一頁（returnedCount / hasMore）：先存起來，之後接「載入更多」時直接用。
   const [resultMeta, setResultMeta] = useState({ returnedCount: 0, hasMore: false })
-  const [categories, setCategories] = useState([])
   const [selectedCategory, setSelectedCategory] = useState(initialUrlState.category)
   const [sort, setSort] = useState(initialUrlState.sort || '')
   const [openNow, setOpenNow] = useState(Boolean(initialUrlState.openNow))
+  const [minRating, setMinRating] = useState(initialUrlState.minRating)
   // 半徑目前跟著網址走（預設 1000）；下一批接上半徑調整滑桿時直接從這裡改。
   const [radius] = useState(initialUrlState.radius)
   const [status, setStatus] = useState('idle') // idle | loading | ready | error
@@ -46,26 +46,9 @@ export default function App() {
       category: selectedCategory,
       sort,
       openNow,
+      minRating,
     })
-  }, [location, radius, selectedCategory, sort, openNow])
-
-  useEffect(() => {
-    if (!location) return
-    fetchCategories({ lat: location.lat, lng: location.lng, radius })
-      .then(setCategories)
-      .catch(() => {
-        setCategories([])
-      })
-  }, [location, radius])
-
-  useEffect(() => {
-    // 換地點後，若新地點的分類清單沒有原本選的分類，就自動回到全部分類。
-    // categories 為空代表還在載入或載入失敗，這時保留使用者的選擇，不要清掉。
-    if (categories.length === 0) return
-    if (selectedCategory && !categories.includes(selectedCategory)) {
-      setSelectedCategory('')
-    }
-  }, [categories, selectedCategory])
+  }, [location, radius, selectedCategory, sort, openNow, minRating])
 
   const loadRestaurants = useCallback(async () => {
     if (!location) return
@@ -76,6 +59,7 @@ export default function App() {
         category: selectedCategory || undefined,
         sort: sort || undefined,
         openNow: openNow ? true : undefined,
+        minRating: minRating || undefined,
         lat: location.lat,
         lng: location.lng,
         radius,
@@ -98,7 +82,7 @@ export default function App() {
       setErrorMessage(err.message || '載入餐廳資料失敗')
       setStatus('error')
     }
-  }, [location, radius, selectedCategory, sort, openNow])
+  }, [location, radius, selectedCategory, sort, openNow, minRating])
 
   useEffect(() => {
     loadRestaurants()
@@ -106,7 +90,7 @@ export default function App() {
 
   useEffect(() => {
     setCandidatePlaceIds(null)
-  }, [location, radius, selectedCategory, sort, openNow])
+  }, [location, radius, selectedCategory, sort, openNow, minRating])
 
   const displayedRestaurants = useMemo(() => {
     if (!candidatePlaceIds) return restaurants
@@ -122,6 +106,14 @@ export default function App() {
   const handleLocationChange = useCallback((nextLocation) => {
     setLocation(nextLocation)
     setSelectedCategory('')
+  }, [])
+
+  // 清除篩選只回到預設分類、最低評分與營業中；排序與地點保留，避免一按就丟掉使用者選的地點。
+  const hasActiveFilters = Boolean(selectedCategory || minRating || openNow)
+  const handleClearFilters = useCallback(() => {
+    setSelectedCategory('')
+    setMinRating(0)
+    setOpenNow(false)
   }, [])
 
   const handleSelectRestaurant = useCallback((restaurant) => {
@@ -155,11 +147,15 @@ export default function App() {
       {location && (
         <div className="controls">
           <CategoryFilter
-            categories={categories}
             selectedCategory={selectedCategory}
             onChange={setSelectedCategory}
           />
-          <SortControl sort={sort} onChange={setSort} />
+          <SortControl
+            sort={sort}
+            onChange={setSort}
+            minRating={minRating}
+            onMinRatingChange={setMinRating}
+          />
           <label className='open-now-control'>
             <input
               type='checkbox'
@@ -176,6 +172,11 @@ export default function App() {
           >
             抽 5 家 🎲
           </button>
+          {hasActiveFilters && (
+            <button type="button" className="clear-filters-button" onClick={handleClearFilters}>
+              清除篩選
+            </button>
+          )}
         </div>
       )}
 
@@ -221,7 +222,14 @@ export default function App() {
               )}
 
               {status === 'ready' && displayedRestaurants.length === 0 && (
-                <p className="empty-state">找不到符合條件的餐廳。</p>
+                <div className="empty-state">
+                  <p>找不到符合條件的餐廳。</p>
+                  {hasActiveFilters && (
+                    <button type="button" className="clear-filters-button" onClick={handleClearFilters}>
+                      清除篩選
+                    </button>
+                  )}
+                </div>
               )}
 
               {displayedRestaurants.length > 0 && (

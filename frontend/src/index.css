@@ -363,3 +363,70 @@ input:focus-visible {
   color: #555;
   font-size: 0.85rem;
 }
+
+/* 分類晶片：窄螢幕整列一行、橫向捲動；寬螢幕自然排列。觸控目標至少 2.5rem。 */
+.category-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1 1 100%;
+  min-width: 0;
+}
+
+.category-filter-label {
+  flex: 0 0 auto;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.category-chips {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.4rem;
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 0.25rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+.category-chip {
+  flex: 0 0 auto;
+  min-height: 2.5rem;
+  padding: 0.35rem 0.8rem;
+  border: 1px solid #3366ff;
+  border-radius: 999px;
+  background: #fff;
+  color: #3366ff;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.category-chip.is-active {
+  background: #3366ff;
+  color: #fff;
+}
+
+.clear-filters-button {
+  min-height: 2.5rem;
+  padding: 0.4rem 0.8rem;
+  border: 1px solid #999;
+  border-radius: 6px;
+  background: #fff;
+  color: #333;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.category-chip:focus-visible,
+.clear-filters-button:focus-visible,
+.draw-candidates-button:focus-visible {
+  outline: 2px solid #3366ff;
+  outline-offset: 2px;
+}
+
+@media (min-width: 768px) {
+  .category-filter {
+    flex: 0 1 auto;
+  }
+}

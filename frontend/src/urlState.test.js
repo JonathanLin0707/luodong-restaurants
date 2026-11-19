@@ -29,6 +29,7 @@ describe('urlState - 讀取網址', () => {
       category: '',
       sort: '',
       openNow: false,
+      minRating: 0,
     })
   })
 
@@ -202,5 +203,31 @@ describe('urlState - 排序與營業中（新）', () => {
     const parsed = parseAppUrl(search)
     expect(parsed.sort).toBe('distance')
     expect(parsed.openNow).toBe(true)
+  })
+})
+
+describe('urlState - 最低評分（新）', () => {
+  const LOC = '?lat=24.6778&lng=121.7684'
+
+  it('minRating 只接受 3.5／4／4.5，其他值（含 0、亂填、超出範圍）一律視為不限', () => {
+    expect(parseAppUrl(`${LOC}&minRating=4`).minRating).toBe(4)
+    expect(parseAppUrl(`${LOC}&minRating=4.5`).minRating).toBe(4.5)
+    expect(parseAppUrl(`${LOC}&minRating=3.5`).minRating).toBe(3.5)
+    expect(parseAppUrl(`${LOC}&minRating=0`).minRating).toBe(0)
+    expect(parseAppUrl(`${LOC}&minRating=abc`).minRating).toBe(0)
+    expect(parseAppUrl(`${LOC}&minRating=4.2`).minRating).toBe(0)
+    expect(parseAppUrl(`${LOC}`).minRating).toBe(0)
+  })
+
+  it('沒有地點時 minRating 一併忽略', () => {
+    expect(parseAppUrl('?minRating=4').minRating).toBe(0)
+  })
+
+  it('toAppUrlParams：不限不寫入網址，4.0 寫成 minRating=4，來回讀寫不變', () => {
+    const loc = { lat: 24.6778, lng: 121.7684, label: 'x' }
+    expect(toAppUrlParams({ location: loc, minRating: 0 }).get('minRating')).toBeNull()
+    expect(toAppUrlParams({ location: loc, minRating: 4 }).get('minRating')).toBe('4')
+    const search = '?' + toAppUrlParams({ location: loc, minRating: 3.5 })
+    expect(parseAppUrl(search).minRating).toBe(3.5)
   })
 })

@@ -176,14 +176,6 @@ describe('App - 透過地點自動完成選擇地點後載入附近餐廳', () =
 
     render(<App />)
     await pickLocation()
-
-    await waitFor(() =>
-      expect(api.fetchCategories).toHaveBeenCalledWith({
-        lat: DEFAULT_LOCATION.lat,
-        lng: DEFAULT_LOCATION.lng,
-        radius: 1000,
-      }),
-    )
     await waitFor(() =>
       expect(api.fetchRestaurants).toHaveBeenCalledWith({
         category: undefined,
@@ -354,11 +346,11 @@ describe('App - 清單渲染（含分類篩選、排序）', () => {
     await screen.findByText('羅東夜市小吃')
     api.fetchRestaurants.mockResolvedValueOnce(apiRestaurants([sampleRestaurants[1]]))
 
-    await user.selectOptions(screen.getByLabelText('分類篩選'), '台式')
+    await user.click(screen.getByRole('button', { name: '小吃' }))
 
     await waitFor(() =>
       expect(api.fetchRestaurants).toHaveBeenLastCalledWith({
-        category: '台式',
+        category: '小吃',
         sort: undefined,
         lat: DEFAULT_LOCATION.lat,
         lng: DEFAULT_LOCATION.lng,
@@ -516,7 +508,7 @@ describe('App - 清單與地圖選取連動', () => {
     await user.click(screen.getByRole('button', { name: '在地圖上顯示 羅東夜市小吃 的位置' }))
 
     api.fetchRestaurants.mockResolvedValueOnce(apiRestaurants([sampleRestaurants[1]]))
-    await user.selectOptions(screen.getByLabelText('分類篩選'), '台式')
+    await user.click(screen.getByRole('button', { name: '小吃' }))
 
     await waitFor(() => expect(screen.queryByText('羅東夜市小吃')).not.toBeInTheDocument())
     await waitFor(() => expect(createdInfoWindows[0].close).toHaveBeenCalled())
@@ -689,7 +681,7 @@ describe('App - 抽 5 家候選', () => {
     expect(screen.getByText(/今天的候選/)).toBeInTheDocument()
 
     api.fetchRestaurants.mockResolvedValueOnce(apiRestaurants([sampleRestaurants[1]]))
-    await user.selectOptions(screen.getByLabelText('分類篩選'), '台式')
+    await user.click(screen.getByRole('button', { name: '小吃' }))
 
     await waitFor(() => expect(screen.queryByText(/今天的候選/)).not.toBeInTheDocument())
     expect(screen.getByText('林場肉羹')).toBeInTheDocument()
@@ -739,8 +731,8 @@ describe('App - 換地點後重置分類篩選', () => {
     await pickLocation()
 
     await screen.findByText('羅東夜市小吃')
-    await user.selectOptions(screen.getByLabelText('分類篩選'), '台式')
-    expect(screen.getByLabelText('分類篩選')).toHaveValue('台式')
+    await user.click(screen.getByRole('button', { name: '小吃' }))
+    expect(screen.getByRole('button', { name: '小吃' })).toHaveAttribute('aria-pressed', 'true')
 
     const otherLocation = { lat: 25.03, lng: 121.56, label: '台北市信義區' }
     const otherRestaurants = [{ ...sampleRestaurants[0], placeId: 'o1', category: '咖啡廳' }]
@@ -749,7 +741,7 @@ describe('App - 換地點後重置分類篩選', () => {
 
     await pickLocation(otherLocation)
 
-    await waitFor(() => expect(screen.getByLabelText('分類篩選')).toHaveValue(''))
+    await waitFor(() => expect(screen.getByRole('button', { name: '全部' })).toHaveAttribute('aria-pressed', 'true'))
     expect(screen.queryByText('找不到符合條件的餐廳。')).not.toBeInTheDocument()
     expect(screen.getByText(otherRestaurants[0].name)).toBeInTheDocument()
   })
@@ -763,8 +755,8 @@ describe('App - 換地點後重置分類篩選', () => {
     await pickLocation()
 
     await screen.findByText('羅東夜市小吃')
-    await user.selectOptions(screen.getByLabelText('分類篩選'), '台式')
-    expect(screen.getByLabelText('分類篩選')).toHaveValue('台式')
+    await user.click(screen.getByRole('button', { name: '小吃' }))
+    expect(screen.getByRole('button', { name: '小吃' })).toHaveAttribute('aria-pressed', 'true')
 
     let resolveCategories
     api.fetchCategories.mockReturnValueOnce(
@@ -776,10 +768,10 @@ describe('App - 換地點後重置分類篩選', () => {
     const otherLocation = { lat: 25.03, lng: 121.56, label: '台北市信義區' }
     await pickLocation(otherLocation)
 
-    expect(screen.getByLabelText('分類篩選')).toHaveValue('')
+    expect(screen.getByRole('button', { name: '全部' })).toHaveAttribute('aria-pressed', 'true')
 
     resolveCategories(sampleCategories)
-    await waitFor(() => expect(screen.getByLabelText('分類篩選')).toHaveValue(''))
+    await waitFor(() => expect(screen.getByRole('button', { name: '全部' })).toHaveAttribute('aria-pressed', 'true'))
   })
 
   it('換到有同名分類的新地點時，換地點後清單會以全部分類重新查詢，不會沿用舊分類篩選', async () => {
@@ -791,7 +783,7 @@ describe('App - 換地點後重置分類篩選', () => {
     await pickLocation()
 
     await screen.findByText('羅東夜市小吃')
-    await user.selectOptions(screen.getByLabelText('分類篩選'), '小吃')
+    await user.click(screen.getByRole('button', { name: '小吃' }))
     await waitFor(() =>
       expect(api.fetchRestaurants).toHaveBeenLastCalledWith(
         expect.objectContaining({ category: '小吃' }),
@@ -805,7 +797,7 @@ describe('App - 換地點後重置分類篩選', () => {
 
     await pickLocation(otherLocation)
 
-    await waitFor(() => expect(screen.getByLabelText('分類篩選')).toHaveValue(''))
+    await waitFor(() => expect(screen.getByRole('button', { name: '全部' })).toHaveAttribute('aria-pressed', 'true'))
     await waitFor(() =>
       expect(api.fetchRestaurants).toHaveBeenLastCalledWith(
         expect.objectContaining({ category: undefined }),
@@ -1083,8 +1075,8 @@ describe('App - 篩選條件寫入網址（重新整理不遺失、可分享）'
     await pickLocation()
     await screen.findByText('羅東夜市小吃')
 
-    await user.selectOptions(screen.getByLabelText('分類篩選'), '台式')
-    await waitFor(() => expect(urlParams().get('category')).toBe('台式'))
+    await user.click(screen.getByRole('button', { name: '小吃' }))
+    await waitFor(() => expect(urlParams().get('category')).toBe('小吃'))
 
     await user.selectOptions(screen.getByLabelText('排序'), 'rating')
     await waitFor(() => expect(urlParams().get('sort')).toBe('rating'))
@@ -1092,7 +1084,7 @@ describe('App - 篩選條件寫入網址（重新整理不遺失、可分享）'
     // 兩個條件同時存在時，網址仍要留著座標
     expect(urlParams().get('lat')).toBe('24.6778')
 
-    await user.selectOptions(screen.getByLabelText('分類篩選'), '')
+    await user.click(screen.getByRole('button', { name: '全部' }))
     await waitFor(() => expect(urlParams().get('category')).toBeNull())
 
     await user.selectOptions(screen.getByLabelText('排序'), '')
@@ -1110,9 +1102,9 @@ describe('App - 篩選條件寫入網址（重新整理不遺失、可分享）'
     render(<App />)
     await pickLocation()
     await screen.findByText('羅東夜市小吃')
-    await user.selectOptions(screen.getByLabelText('分類篩選'), '台式')
+    await user.click(screen.getByRole('button', { name: '小吃' }))
 
-    await waitFor(() => expect(urlParams().get('category')).toBe('台式'))
+    await waitFor(() => expect(urlParams().get('category')).toBe('小吃'))
     expect(replaceState).toHaveBeenCalled()
     expect(pushState).not.toHaveBeenCalled()
 
@@ -1137,7 +1129,7 @@ describe('App - 篩選條件寫入網址（重新整理不遺失、可分享）'
     api.fetchCategories.mockResolvedValue(sampleCategories)
     api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
     setUrl(
-      `lat=${LUODONG.lat}&lng=${LUODONG.lng}&radius=6000&category=${encodeURIComponent('台式')}&sort=rating`,
+      `lat=${LUODONG.lat}&lng=${LUODONG.lng}&radius=6000&category=${encodeURIComponent('小吃')}&sort=rating`,
     )
 
     render(<App />)
@@ -1145,17 +1137,9 @@ describe('App - 篩選條件寫入網址（重新整理不遺失、可分享）'
     expect(screen.queryByText('請先選擇地點，才能顯示附近餐廳。')).not.toBeInTheDocument()
     expect(screen.getByText('附近餐廳推薦：宜蘭縣羅東鎮')).toBeInTheDocument()
     expect(screen.getByLabelText('地點')).toHaveValue('宜蘭縣羅東鎮')
-
-    await waitFor(() =>
-      expect(api.fetchCategories).toHaveBeenCalledWith({
-        lat: LUODONG.lat,
-        lng: LUODONG.lng,
-        radius: 6000,
-      }),
-    )
     await waitFor(() =>
       expect(api.fetchRestaurants).toHaveBeenCalledWith({
-        category: '台式',
+        category: '小吃',
         sort: 'rating',
         lat: LUODONG.lat,
         lng: LUODONG.lng,
@@ -1163,7 +1147,7 @@ describe('App - 篩選條件寫入網址（重新整理不遺失、可分享）'
       }),
     )
 
-    expect(await screen.findByLabelText('分類篩選')).toHaveValue('台式')
+    expect(await screen.getByRole('button', { name: '小吃' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByLabelText('排序')).toHaveValue('rating')
   })
 
@@ -1175,7 +1159,7 @@ describe('App - 篩選條件寫入網址（重新整理不遺失、可分享）'
     const first = render(<App />)
     await pickLocation()
     await screen.findByText('羅東夜市小吃')
-    await user.selectOptions(screen.getByLabelText('分類篩選'), '台式')
+    await user.click(screen.getByRole('button', { name: '小吃' }))
     await user.selectOptions(screen.getByLabelText('排序'), 'rating')
     await waitFor(() => expect(urlParams().get('sort')).toBe('rating'))
 
@@ -1191,7 +1175,7 @@ describe('App - 篩選條件寫入網址（重新整理不遺失、可分享）'
 
     await waitFor(() =>
       expect(api.fetchRestaurants).toHaveBeenCalledWith({
-        category: '台式',
+        category: '小吃',
         sort: 'rating',
         lat: DEFAULT_LOCATION.lat,
         lng: DEFAULT_LOCATION.lng,
@@ -1222,7 +1206,7 @@ describe('App - 篩選條件寫入網址（重新整理不遺失、可分享）'
 
   it('網址座標不合法或只有一半時，視為尚未選地點，不打任何 API', async () => {
     for (const search of ['lat=abc&lng=121.7684', 'lat=91&lng=121.7684', 'lat=24.6778', 'lng=121.7684']) {
-      setUrl(`${search}&category=${encodeURIComponent('台式')}&sort=rating`)
+      setUrl(`${search}&category=${encodeURIComponent('小吃')}&sort=rating`)
       const { unmount } = render(<App />)
 
       expect(screen.getAllByText('請先選擇地點，才能顯示附近餐廳。').length).toBeGreaterThan(0)
@@ -1241,7 +1225,7 @@ describe('App - 篩選條件寫入網址（重新整理不遺失、可分享）'
   it('換地點後網址換成新座標，舊分類條件不會跟著帶過去', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
     api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
-    setUrl('lat=24.6778&lng=121.7684&category=' + encodeURIComponent('台式'))
+    setUrl('lat=24.6778&lng=121.7684&category=' + encodeURIComponent('小吃'))
 
     const user = userEvent.setup()
     render(<App />)
@@ -1409,5 +1393,102 @@ describe('App - openNow 與 sort=distance 控制項 B', () => {
     await screen.findByText('羅東夜市小吃')
     await user.selectOptions(screen.getByLabelText('排序'), 'distance')
     await waitFor(() => expect(window.location.search).toContain('sort=distance'))
+  })
+})
+
+describe('App - 分類晶片與最低評分（新）', () => {
+  it('「咖啡甜點」晶片送出後端多值分類 咖啡廳,甜點烘焙；「其他」送出五個細類', async () => {
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
+    const user = userEvent.setup()
+    render(<App />)
+    await pickLocation()
+    await screen.findByText('羅東夜市小吃')
+
+    await user.click(screen.getByRole('button', { name: '咖啡甜點' }))
+    await waitFor(() =>
+      expect(api.fetchRestaurants).toHaveBeenLastCalledWith(
+        expect.objectContaining({ category: '咖啡廳,甜點烘焙' }),
+      ),
+    )
+    expect(screen.getByRole('button', { name: '咖啡甜點' })).toHaveAttribute('aria-pressed', 'true')
+
+    await user.click(screen.getByRole('button', { name: '其他' }))
+    await waitFor(() =>
+      expect(api.fetchRestaurants).toHaveBeenLastCalledWith(
+        expect.objectContaining({ category: '日式,自助餐,海鮮,熱炒,其他' }),
+      ),
+    )
+  })
+
+  it('選最低評分 4.0 會帶 minRating 查詢並寫進網址，重新整理後還原', async () => {
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
+    const user = userEvent.setup()
+    render(<App />)
+    await pickLocation()
+    await screen.findByText('羅東夜市小吃')
+
+    await user.selectOptions(screen.getByLabelText('最低評分'), '4')
+    await waitFor(() =>
+      expect(api.fetchRestaurants).toHaveBeenLastCalledWith(
+        expect.objectContaining({ minRating: 4 }),
+      ),
+    )
+    expect(urlParams().get('minRating')).toBe('4')
+  })
+
+  it('分享連結帶 minRating=4.5 時一開啟就套用並還原下拉選單', async () => {
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
+    setUrl(`lat=${DEFAULT_LOCATION.lat}&lng=${DEFAULT_LOCATION.lng}&minRating=4.5`)
+    render(<App />)
+
+    await waitFor(() =>
+      expect(api.fetchRestaurants).toHaveBeenCalledWith(
+        expect.objectContaining({ minRating: 4.5 }),
+      ),
+    )
+    expect(screen.getByLabelText('最低評分')).toHaveValue('4.5')
+  })
+
+  it('清除篩選會回到全部分類、不限評分並關閉營業中，但保留排序與地點', async () => {
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
+    const user = userEvent.setup()
+    render(<App />)
+    await pickLocation()
+    await screen.findByText('羅東夜市小吃')
+
+    await user.click(screen.getByRole('button', { name: '火鍋' }))
+    await user.selectOptions(screen.getByLabelText('最低評分'), '4')
+    await user.click(screen.getByLabelText('只看營業中'))
+    await user.selectOptions(screen.getByLabelText('排序'), 'rating')
+
+    await user.click(screen.getByRole('button', { name: '清除篩選' }))
+
+    expect(screen.getByRole('button', { name: '全部' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByLabelText('最低評分')).toHaveValue('0')
+    expect(screen.getByLabelText('只看營業中')).not.toBeChecked()
+    expect(screen.getByLabelText('排序')).toHaveValue('rating')
+    expect(urlParams().get('lat')).toBe(String(DEFAULT_LOCATION.lat))
+    expect(urlParams().get('category')).toBeNull()
+    expect(urlParams().get('minRating')).toBeNull()
+  })
+
+  it('篩選後沒有結果時，空狀態顯示清除篩選按鈕', async () => {
+    api.fetchRestaurants.mockResolvedValueOnce(apiRestaurants(sampleRestaurants))
+    const user = userEvent.setup()
+    render(<App />)
+    await pickLocation()
+    await screen.findByText('羅東夜市小吃')
+
+    api.fetchRestaurants.mockResolvedValueOnce(apiRestaurants([]))
+    await user.selectOptions(screen.getByLabelText('最低評分'), '4.5')
+
+    expect(await screen.findByText('找不到符合條件的餐廳。')).toBeInTheDocument()
+    const clearButtons = screen.getAllByRole('button', { name: '清除篩選' })
+    expect(clearButtons.length).toBeGreaterThan(0)
+
+    api.fetchRestaurants.mockResolvedValueOnce(apiRestaurants(sampleRestaurants))
+    await user.click(clearButtons[clearButtons.length - 1])
+    expect(await screen.findByText('羅東夜市小吃')).toBeInTheDocument()
+    expect(screen.getByLabelText('最低評分')).toHaveValue('0')
   })
 })
