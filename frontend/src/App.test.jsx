@@ -1502,7 +1502,7 @@ describe('App - Render 休眠喚醒提示', () => {
     expect(screen.getByText('載入中…')).toBeInTheDocument()
     resolveFetch(apiRestaurants(sampleRestaurants))
     await waitFor(() => expect(screen.getByText('羅東夜市小吃')).toBeInTheDocument())
-  })
+  }, 8000)
 
   it('(b) 達 3s 顯示喚醒文案', async () => {
     let resolveFetch
@@ -1510,13 +1510,10 @@ describe('App - Render 休眠喚醒提示', () => {
     api.fetchRestaurants.mockReturnValue(new Promise((resolve) => { resolveFetch = resolve }))
     render(<App />)
     await pickLocation()
-    vi.useFakeTimers()
-    await act(async () => { vi.advanceTimersByTime(3000) })
-    expect(screen.getByText('正在喚醒伺服器，通常需要十幾秒到幾十秒，請稍候…')).toBeInTheDocument()
-    vi.useRealTimers()
+    await waitFor(() => expect(screen.getByText('正在喚醒伺服器，通常需要十幾秒到幾十秒，請稍候…')).toBeInTheDocument(), { timeout: 4000 })
     resolveFetch(apiRestaurants(sampleRestaurants))
     await waitFor(() => expect(screen.getByText('羅東夜市小吃')).toBeInTheDocument())
-  })
+  }, 8000)
 
   it('(c) 完成後 timer 清除不再跳訊息', async () => {
     api.fetchCategories.mockResolvedValue(sampleCategories)
@@ -1524,24 +1521,41 @@ describe('App - Render 休眠喚醒提示', () => {
     render(<App />)
     await pickLocation()
     await waitFor(() => expect(screen.getByText('羅東夜市小吃')).toBeInTheDocument())
+    await new Promise((r) => setTimeout(r, 3100))
     expect(screen.queryByText('正在喚醒伺服器，通常需要十幾秒到幾十秒，請稍候…')).not.toBeInTheDocument()
-  })
+  }, 8000)
 
   it('(d) 換地點重設計時', async () => {
+    let r1, r2
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
+    api.fetchRestaurants
+      .mockReturnValueOnce(new Promise((resolve) => { r1 = resolve }))
+      .mockReturnValueOnce(new Promise((resolve) => { r2 = resolve }))
     render(<App />)
-    await pickLocation()
-    await waitFor(() => expect(screen.getByText('羅東夜市小吃')).toBeInTheDocument())
+    await pickLocation({ lat: 24.67, lng: 121.76, label: 'A' })
+    await new Promise((r) => setTimeout(r, 2500))
     expect(screen.queryByText('正在喚醒伺服器，通常需要十幾秒到幾十秒，請稍候…')).not.toBeInTheDocument()
-  })
+    await pickLocation({ lat: 25.0, lng: 121.5, label: 'B' })
+    await new Promise((r) => setTimeout(r, 1000))
+    expect(screen.queryByText('正在喚醒伺服器，通常需要十幾秒到幾十秒，請稍候…')).not.toBeInTheDocument()
+    await new Promise((r) => setTimeout(r, 2200))
+    expect(screen.getByText('正在喚醒伺服器，通常需要十幾秒到幾十秒，請稍候…')).toBeInTheDocument()
+    r2(apiRestaurants(sampleRestaurants))
+    await waitFor(() => expect(screen.getByText('羅東夜市小吃')).toBeInTheDocument())
+  }, 12000)
 
   it('(e) 過期回應不得清掉新請求的提示/計時器', async () => {
+    let r1, r2
     api.fetchCategories.mockResolvedValue(sampleCategories)
-    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
+    api.fetchRestaurants
+      .mockReturnValueOnce(new Promise((resolve) => { r1 = resolve }))
+      .mockReturnValueOnce(new Promise((resolve) => { r2 = resolve }))
     render(<App />)
-    await pickLocation()
+    await pickLocation({ lat: 24.67, lng: 121.76, label: 'A' })
+    await pickLocation({ lat: 25.0, lng: 121.5, label: 'B' })
+    r2(apiRestaurants(sampleRestaurants))
     await waitFor(() => expect(screen.getByText('羅東夜市小吃')).toBeInTheDocument())
+    r1(apiRestaurants(sampleRestaurants))
     expect(screen.queryByText('正在喚醒伺服器，通常需要十幾秒到幾十秒，請稍候…')).not.toBeInTheDocument()
-  })
+  }, 8000)
 })
