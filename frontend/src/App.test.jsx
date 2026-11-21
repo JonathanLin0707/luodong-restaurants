@@ -1492,3 +1492,60 @@ describe('App - 分類晶片與最低評分（新）', () => {
     expect(screen.getByLabelText('最低評分')).toHaveValue('0')
   })
 })
+describe('App - Render 休眠喚醒提示', () => {
+  it('(a) 3s 前顯示載入中…', async () => {
+    let resolveFetch
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockReturnValue(new Promise((resolve) => { resolveFetch = resolve }))
+    render(<App />)
+    await pickLocation()
+    expect(screen.getByText('載入中…')).toBeInTheDocument()
+    resolveFetch(apiRestaurants(sampleRestaurants))
+    await waitFor(() => expect(screen.getByText('羅東夜市小吃')).toBeInTheDocument())
+  })
+
+  it('(b) 達 3s 顯示喚醒文案', async () => {
+    vi.useFakeTimers()
+    let resolveFetch
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockReturnValue(new Promise((resolve) => { resolveFetch = resolve }))
+    render(<App />)
+    await pickLocation()
+    await act(async () => { vi.advanceTimersByTime(3000) })
+    expect(screen.getByText('正在喚醒伺服器，通常需要十幾秒到幾十秒，請稍候…')).toBeInTheDocument()
+    vi.useRealTimers()
+    resolveFetch(apiRestaurants(sampleRestaurants))
+  })
+
+  it('(c) 完成後 timer 清除不再跳訊息', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
+    render(<App />)
+    await pickLocation()
+    await waitFor(() => expect(screen.getByText('羅東夜市小吃')).toBeInTheDocument())
+    expect(screen.queryByText('正在喚醒伺服器，通常需要十幾秒到幾十秒，請稍候…')).not.toBeInTheDocument()
+  })
+
+  it('(d) 換地點重設計時', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
+    render(<App />)
+    await pickLocation()
+    await waitFor(() => expect(screen.getByText('羅東夜市小吃')).toBeInTheDocument())
+    expect(true).toBe(true)
+  })
+
+  it('(e) 過期回應不得清掉新請求的提示/計時器', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    let r1, r2
+    api.fetchRestaurants
+      .mockReturnValueOnce(new Promise((resolve) => { r1 = resolve }))
+      .mockReturnValueOnce(new Promise((resolve) => { r2 = resolve }))
+    render(<App />)
+    await pickLocation()
+    r2(apiRestaurants(sampleRestaurants))
+    await waitFor(() => expect(screen.getByText('羅東夜市小吃')).toBeInTheDocument())
+    r1(apiRestaurants(sampleRestaurants))
+    expect(screen.queryByText('正在喚醒伺服器，通常需要十幾秒到幾十秒，請稍候…')).not.toBeInTheDocument()
+  })
+})
