@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import MapView from './components/MapView.jsx'
 import RestaurantList from './components/RestaurantList.jsx'
 import CategoryFilter from './components/CategoryFilter.jsx'
@@ -34,6 +34,10 @@ export default function App() {
   // 半徑目前跟著網址走（預設 1000）；下一批接上半徑調整滑桿時直接從這裡改。
   const [radius] = useState(initialUrlState.radius)
   const [status, setStatus] = useState('idle') // idle | loading | ready | error
+  const [showWakeup, setShowWakeup] = useState(false)
+  const genRef = useRef(0)
+  const timerRef = useRef(null)
+  const statusRef = useRef('idle')
   const [errorMessage, setErrorMessage] = useState('')
   const [selectedPlaceId, setSelectedPlaceId] = useState(null)
   const [selectNonce, setSelectNonce] = useState(0)
@@ -52,8 +56,15 @@ export default function App() {
 
   const loadRestaurants = useCallback(async () => {
     if (!location) return
+    const gen = ++genRef.current
+    clearTimeout(timerRef.current)
     setStatus('loading')
+    statusRef.current = 'loading'
     setErrorMessage('')
+    setShowWakeup(false)
+    timerRef.current = setTimeout(() => {
+      if (statusRef.current === 'loading') setShowWakeup(true)
+    }, 3000)
     try {
       const data = await fetchRestaurants({
         category: selectedCategory || undefined,
@@ -64,12 +75,14 @@ export default function App() {
         lng: location.lng,
         radius,
       })
-      // c0ee72c 起 /api/restaurants 回傳 { restaurants, returnedCount, hasMore, count } 物件，
-      // 清單一律取 data.restaurants；形狀不對時退回空清單並走錯誤狀態，不會白屏。
+      if (gen !== genRef.current) return
       const list = Array.isArray(data?.restaurants) ? data.restaurants : []
       if (!Array.isArray(data?.restaurants)) {
+        clearTimeout(timerRef.current)
+        setShowWakeup(false)
         setErrorMessage('餐廳資料格式異常，請稍後再試')
         setStatus('error')
+        statusRef.current = 'error'
         return
       }
       setRestaurants(list)
@@ -77,16 +90,25 @@ export default function App() {
         returnedCount: data.returnedCount ?? list.length,
         hasMore: Boolean(data.hasMore),
       })
+      clearTimeout(timerRef.current)
+      setShowWakeup(false)
       setStatus('ready')
+      statusRef.current = 'ready'
     } catch (err) {
+      if (gen !== genRef.current) return
+      clearTimeout(timerRef.current)
+      setShowWakeup(false)
       setErrorMessage(err.message || '載入餐廳資料失敗')
       setStatus('error')
+      statusRef.current = 'error'
     }
   }, [location, radius, selectedCategory, sort, openNow, minRating])
 
   useEffect(() => {
     loadRestaurants()
   }, [loadRestaurants])
+
+  useEffect(() => () => clearTimeout(timerRef.current), [])
 
   useEffect(() => {
     setCandidatePlaceIds(null)
@@ -192,7 +214,11 @@ export default function App() {
                 </p>
               )}
 
-              {status === 'loading' && <p role="status">載入中…</p>}
+              {status === 'loading' && (
+                <p role="status">
+                  {showWakeup ? '正在喚醒伺服器，通常需要十幾秒到幾十秒，請稍候…' : '載入中…'}
+                </p>
+              )}
 
               {status === 'error' && !restaurants.length && (
                 <div role="alert">
