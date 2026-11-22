@@ -4,10 +4,13 @@ import RestaurantList from './components/RestaurantList.jsx'
 import CategoryFilter from './components/CategoryFilter.jsx'
 import SortControl from './components/SortControl.jsx'
 import LocationPicker from './components/LocationPicker.jsx'
+import RadiusControl from './components/RadiusControl.jsx'
 import { fetchRestaurants } from './api.js'
 import { parseAppUrl, syncAppUrl } from './urlState.js'
+import { loadFavorites, removeFavorite, saveFavorites, toggleFavorite } from './favorites.js'
 
 const CANDIDATE_COUNT = 5
+const MAX_PAGES = 3
 
 function shuffleArray(array) {
   const result = [...array]
@@ -25,14 +28,17 @@ export default function App() {
   )
   const [location, setLocation] = useState(initialUrlState.location)
   const [restaurants, setRestaurants] = useState([])
-  // /api/restaurants 的回傳筆數與是否有下一頁（returnedCount / hasMore）：先存起來，之後接「載入更多」時直接用。
+  // /api/restaurants 的回傳筆數與是否有下一頁（returnedCount / hasMore）。
   const [resultMeta, setResultMeta] = useState({ returnedCount: 0, hasMore: false })
   const [selectedCategory, setSelectedCategory] = useState(initialUrlState.category)
   const [sort, setSort] = useState(initialUrlState.sort || '')
   const [openNow, setOpenNow] = useState(Boolean(initialUrlState.openNow))
   const [minRating, setMinRating] = useState(initialUrlState.minRating)
-  // 半徑目前跟著網址走（預設 1000）；下一批接上半徑調整滑桿時直接從這裡改。
-  const [radius] = useState(initialUrlState.radius)
+  const [radius, setRadius] = useState(initialUrlState.radius)
+  // 「載入更多」用頁數累加重新查，每次取代清單；上限 3 頁。
+  const [pages, setPages] = useState(1)
+  const [favorites, setFavorites] = useState(() => loadFavorites())
+  const [favoritesOpen, setFavoritesOpen] = useState(false)
   const [status, setStatus] = useState('idle') // idle | loading | ready | error
   const [showWakeup, setShowWakeup] = useState(false)
   const genRef = useRef(0)
@@ -74,6 +80,7 @@ export default function App() {
         lat: location.lat,
         lng: location.lng,
         radius,
+        pages: pages > 1 ? pages : undefined,
       })
       if (gen !== genRef.current) return
       const list = Array.isArray(data?.restaurants) ? data.restaurants : []
@@ -102,7 +109,7 @@ export default function App() {
       setStatus('error')
       statusRef.current = 'error'
     }
-  }, [location, radius, selectedCategory, sort, openNow, minRating])
+  }, [location, radius, selectedCategory, sort, openNow, minRating, pages])
 
   useEffect(() => {
     loadRestaurants()
@@ -110,7 +117,9 @@ export default function App() {
 
   useEffect(() => () => clearTimeout(timerRef.current), [])
 
+  // 任何查詢條件（含半徑）變更都回到第 1 頁，並清掉候選。
   useEffect(() => {
+    setPages(1)
     setCandidatePlaceIds(null)
   }, [location, radius, selectedCategory, sort, openNow, minRating])
 
@@ -125,10 +134,36 @@ export default function App() {
     }
   }, [displayedRestaurants, selectedPlaceId])
 
+  const favoriteIds = useMemo(() => favorites.map((item) => item.placeId), [favorites])
+
   const handleLocationChange = useCallback((nextLocation) => {
     setLocation(nextLocation)
     setSelectedCategory('')
   }, [])
+
+  const handleToggleFavorite = useCallback((restaurant) => {
+    setFavorites((prev) => {
+      const next = toggleFavorite(prev, restaurant)
+      saveFavorites(next)
+      return next
+    })
+  }, [])
+
+  const handleRemoveFavorite = useCallback((placeId) => {
+    setFavorites((prev) => {
+      const next = removeFavorite(prev, placeId)
+      saveFavorites(next)
+      return next
+    })
+  }, [])
+
+  const handleLoadMore = useCallback(() => {
+    // 用 genRef 去重，避免在載入中重複送出；每次只累加一頁，最多 3 頁。
+    if (statusRef.current === 'loading') return
+    if (pages >= MAX_PAGES) return
+    setCandidatePlaceIds(null)
+    setPages((p) => Math.min(MAX_PAGES, p + 1))
+  }, [pages])
 
   // 清除篩選只回到預設分類、最低評分與營業中；排序與地點保留，避免一按就丟掉使用者選的地點。
   const hasActiveFilters = Boolean(selectedCategory || minRating || openNow)
@@ -168,6 +203,7 @@ export default function App() {
 
       {location && (
         <div className="controls">
+          <RadiusControl radius={radius} onChange={setRadius} />
           <CategoryFilter
             selectedCategory={selectedCategory}
             onChange={setSelectedCategory}
@@ -200,6 +236,48 @@ export default function App() {
             </button>
           )}
         </div>
+      )}
+
+      {favorites.length > 0 && (
+        <section className='favorites-panel' aria-label='收藏清單'>
+          <button
+            type='button'
+            className='favorites-toggle'
+            aria-expanded={favoritesOpen}
+            onClick={() => setFavoritesOpen((open) => !open)}
+          >
+            {favoritesOpen ? '▼' : '▶'} 收藏（{favorites.length}）
+          </button>
+          {favoritesOpen && (
+            <ul className='favorites-list'>
+              {favorites.map((item) => (
+                <li key={item.placeId} className='favorite-item'>
+                  <span className='favorite-info'>
+                    <strong>{item.name}</strong>
+                    <span>・{item.category}</span>
+                    <span>・{item.address}</span>
+                  </span>
+                  <button
+                    type='button'
+                    className='favorite-map-link'
+                    onClick={() => handleOpenMaps(item)}
+                    aria-label={`在 Google 地圖開啟 ${item.name}`}
+                  >
+                    開啟地圖 ↗
+                  </button>
+                  <button
+                    type='button'
+                    className='favorite-remove'
+                    onClick={() => handleRemoveFavorite(item.placeId)}
+                    aria-label={`移除收藏 ${item.name}`}
+                  >
+                    移除
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       )}
 
       <div className="layout">
@@ -264,7 +342,20 @@ export default function App() {
                   selectedPlaceId={selectedPlaceId}
                   onSelect={handleSelectRestaurant}
                   onOpenMaps={handleOpenMaps}
+                  favoriteIds={favoriteIds}
+                  onToggleFavorite={handleToggleFavorite}
                 />
+              )}
+
+              {status === 'ready' && resultMeta.hasMore && pages < MAX_PAGES && (
+                <button
+                  type='button'
+                  className='load-more-button'
+                  onClick={handleLoadMore}
+                  disabled={status === 'loading'}
+                >
+                  載入更多（第 {pages + 1} 頁）
+                </button>
               )}
             </>
           )}

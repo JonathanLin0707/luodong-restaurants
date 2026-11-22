@@ -28,7 +28,7 @@ function formatDistance(meters) {
   return `${(Math.floor(meters / 100) / 10).toFixed(1)} km`
 }
 
-export default function RestaurantCard({ restaurant, isSelected, onSelect, onOpenMaps }) {
+export default function RestaurantCard({ restaurant, isSelected, onSelect, onOpenMaps, isFavorite = false, onToggleFavorite }) {
   const { name, rating, userRatingsTotal, address, category, isOpen, isOpenBasis, priceLevel, distanceMeters } = restaurant
   const roundedStars = rating != null ? Math.round(rating) : 0
   const cardRef = useRef(null)
@@ -53,6 +53,11 @@ export default function RestaurantCard({ restaurant, isSelected, onSelect, onOpe
   function handleOpenMapsClick(e) {
     e.stopPropagation()
     onOpenMaps(restaurant)
+  }
+
+  function handleToggleFavoriteClick(e) {
+    e.stopPropagation()
+    if (onToggleFavorite) onToggleFavorite(restaurant)
   }
 
   const status = openStatusInfo(isOpenBasis, isOpen)
@@ -111,14 +116,25 @@ export default function RestaurantCard({ restaurant, isSelected, onSelect, onOpe
           )}
         </div>
       </div>
-      <button
-        type="button"
-        className="open-maps-link"
-        onClick={handleOpenMapsClick}
-        aria-label={`在 Google 地圖開啟 ${name}`}
-      >
-        開啟地圖 ↗
-      </button>
+      <div className='restaurant-card-actions'>
+        <button
+          type='button'
+          className={`favorite-button${isFavorite ? ' favorite-button-active' : ''}`}
+          onClick={handleToggleFavoriteClick}
+          aria-pressed={isFavorite}
+          aria-label={`${isFavorite ? '取消收藏' : '收藏'} ${name}`}
+        >
+          {isFavorite ? '★ 已收藏' : '☆ 收藏'}
+        </button>
+        <button
+          type="button"
+          className="open-maps-link"
+          onClick={handleOpenMapsClick}
+          aria-label={`在 Google 地圖開啟 ${name}`}
+        >
+          開啟地圖 ↗
+        </button>
+      </div>
     </li>
   )
 }

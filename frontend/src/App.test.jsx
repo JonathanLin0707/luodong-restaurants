@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor, within, act } from '@testing-library/react'
+import { render, screen, waitFor, within, act, fireEvent } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from './App.jsx'
 import * as api from './api.js'
@@ -1558,4 +1558,264 @@ describe('App - Render 休眠喚醒提示', () => {
     r1(apiRestaurants(sampleRestaurants))
     expect(screen.queryByText('正在喚醒伺服器，通常需要十幾秒到幾十秒，請稍候…')).not.toBeInTheDocument()
   }, 8000)
+})
+
+describe('App - 半徑調整', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+  })
+
+  it('初始無 radius：滑桿 1000、網址不帶 radius、查詢帶 radius:1000', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
+
+    const user = userEvent.setup()
+    render(<App />)
+    await pickLocation()
+
+    await screen.findByText('羅東夜市小吃')
+    expect(screen.getByLabelText('搜尋半徑')).toHaveValue('1000')
+    expect(window.location.search).not.toContain('radius=')
+    expect(api.fetchRestaurants).toHaveBeenCalledWith(
+      expect.objectContaining({ radius: 1000, pages: undefined }),
+    )
+  })
+
+  it('拖到 6000：重新查詢帶新 radius、網址同步，重新整理仍保留', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
+
+    const user = userEvent.setup()
+    const { unmount } = render(<App />)
+    await pickLocation()
+    await screen.findByText('羅東夜市小吃')
+
+    // range input 用 fireEvent 直接設值較可靠。
+    fireEvent.change(screen.getByLabelText('搜尋半徑'), { target: { value: '6000' } })
+
+    await waitFor(() =>
+      expect(api.fetchRestaurants).toHaveBeenLastCalledWith(
+        expect.objectContaining({ radius: 6000 }),
+      ),
+    )
+    await waitFor(() => expect(window.location.search).toContain('radius=6000'))
+    unmount()
+
+    window.history.replaceState(null, '', window.location.search)
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
+    render(<App />)
+    expect(screen.getByLabelText('搜尋半徑')).toHaveValue('6000')
+  })
+
+  it('設回 1000：網址的 radius 消失', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
+
+    const user = userEvent.setup()
+    window.history.replaceState(null, '', '/?lat=24.6778&lng=121.7684&radius=6000')
+    render(<App />)
+    await screen.findByText('羅東夜市小吃')
+
+    fireEvent.change(screen.getByLabelText('搜尋半徑'), { target: { value: '1000' } })
+
+    await waitFor(() => expect(window.location.search).not.toContain('radius='))
+    expect(screen.getByLabelText('搜尋半徑')).toHaveValue('1000')
+  })
+})
+
+describe('App - 載入更多', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+  })
+
+  it('hasMore=true 顯示按鈕；按一次以 pages:2 重查並取代清單；hasMore=false 後按鈕消失', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    const firstPage = apiRestaurants(sampleRestaurants)
+    api.fetchRestaurants.mockResolvedValueOnce({ ...firstPage, hasMore: true })
+
+    const user = userEvent.setup()
+    render(<App />)
+    await pickLocation()
+    await screen.findByText('羅東夜市小吃')
+
+    const loadMore = screen.getByRole('button', { name: /載入更多/ })
+    expect(loadMore).toBeInTheDocument()
+
+    const secondPage = { restaurants: manyRestaurants, returnedCount: 7, hasMore: false, count: 7 }
+    api.fetchRestaurants.mockResolvedValueOnce(secondPage)
+    await user.click(loadMore)
+
+    await waitFor(() =>
+      expect(api.fetchRestaurants).toHaveBeenLastCalledWith(
+        expect.objectContaining({ pages: 2, radius: 1000 }),
+      ),
+    )
+    await screen.findByText('候選店1')
+    expect(screen.queryByText('羅東夜市小吃')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByRole('button', { name: /載入更多/ })).not.toBeInTheDocument())
+  })
+
+  it('最多 3 頁：pages=3 後不再發出請求', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue({ ...apiRestaurants(sampleRestaurants), hasMore: true })
+
+    const user = userEvent.setup()
+    render(<App />)
+    await pickLocation()
+    await screen.findByText('羅東夜市小吃')
+
+    await user.click(screen.getByRole('button', { name: /載入更多/ }))
+    await waitFor(() =>
+      expect(api.fetchRestaurants).toHaveBeenLastCalledWith(expect.objectContaining({ pages: 2 })),
+    )
+    await user.click(screen.getByRole('button', { name: /載入更多/ }))
+    await waitFor(() =>
+      expect(api.fetchRestaurants).toHaveBeenLastCalledWith(expect.objectContaining({ pages: 3 })),
+    )
+    const callsAtThree = api.fetchRestaurants.mock.calls.length
+    expect(screen.queryByRole('button', { name: /載入更多/ })).not.toBeInTheDocument()
+    expect(api.fetchRestaurants.mock.calls.length).toBe(callsAtThree)
+  })
+
+  it('變更分類後回到第 1 頁，只顯示第 1 頁結果', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue({ ...apiRestaurants(sampleRestaurants), hasMore: true })
+
+    const user = userEvent.setup()
+    render(<App />)
+    await pickLocation()
+    await screen.findByText('羅東夜市小吃')
+
+    await user.click(screen.getByRole('button', { name: /載入更多/ }))
+    await waitFor(() =>
+      expect(api.fetchRestaurants).toHaveBeenLastCalledWith(expect.objectContaining({ pages: 2 })),
+    )
+    api.fetchRestaurants.mockResolvedValueOnce(apiRestaurants([sampleRestaurants[1]]))
+    await user.click(screen.getByRole('button', { name: '小吃' }))
+
+    await waitFor(() =>
+      expect(api.fetchRestaurants).toHaveBeenLastCalledWith(
+        expect.objectContaining({ category: '小吃', pages: undefined }),
+      ),
+    )
+    expect(screen.getByText('林場肉羹')).toBeInTheDocument()
+  })
+
+  it('有候選時按載入更多會清掉候選橫幅', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue({ ...apiRestaurants(manyRestaurants), hasMore: true })
+
+    const user = userEvent.setup()
+    render(<App />)
+    await pickLocation()
+    await screen.findByText('候選店1')
+    await user.click(screen.getByRole('button', { name: '抽 5 家 🎲' }))
+    expect(screen.getByText(/今天的候選/)).toBeInTheDocument()
+
+    api.fetchRestaurants.mockResolvedValueOnce(apiRestaurants(manyRestaurants))
+    await user.click(screen.getByRole('button', { name: /載入更多/ }))
+    await waitFor(() => expect(screen.queryByText(/今天的候選/)).not.toBeInTheDocument())
+    expect(screen.getByText('候選店1')).toBeInTheDocument()
+  })
+})
+
+describe('App - 收藏', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+  })
+
+  it('收藏後 unmount 再 render 仍在；再按一次從收藏消失', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
+
+    const user = userEvent.setup()
+    const { unmount } = render(<App />)
+    await pickLocation()
+    await screen.findByText('羅東夜市小吃')
+
+    await user.click(screen.getByRole('button', { name: '收藏 羅東夜市小吃' }))
+    expect(screen.getByRole('button', { name: /取消收藏 羅東夜市小吃/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /收藏（1）/ })).toBeInTheDocument()
+    unmount()
+
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
+    render(<App />)
+    await screen.findByText('羅東夜市小吃')
+    expect(screen.getByRole('button', { name: /取消收藏 羅東夜市小吃/ })).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /取消收藏 羅東夜市小吃/ }))
+    expect(screen.queryByRole('button', { name: /收藏（1）/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '收藏 羅東夜市小吃' })).toBeInTheDocument()
+  })
+
+  it('面板可收合，列出名稱/分類/地址，並可開啟地圖與移除', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
+
+    const user = userEvent.setup()
+    render(<App />)
+    await pickLocation()
+    await screen.findByText('羅東夜市小吃')
+    await user.click(screen.getByRole('button', { name: '收藏 羅東夜市小吃' }))
+
+    const toggle = screen.getByRole('button', { name: /收藏（1）/ })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    await user.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    const panel = screen.getByRole('region', { name: '收藏清單' })
+    expect(within(panel).getByText(/^・小吃$/)).toBeInTheDocument()
+    expect(within(panel).getByText(/民權路1號/)).toBeInTheDocument()
+
+    await user.click(within(panel).getByRole('button', { name: '在 Google 地圖開啟 羅東夜市小吃' }))
+    expect(window.open).toHaveBeenCalledWith(
+      'https://maps.google.com/?cid=p1',
+      '_blank',
+      'noopener,noreferrer',
+    )
+
+    await user.click(screen.getByRole('button', { name: '移除收藏 羅東夜市小吃' }))
+    expect(screen.queryByRole('button', { name: /收藏（1）/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '收藏 羅東夜市小吃' })).toBeInTheDocument()
+  })
+
+  it('清空 localStorage 後收藏消失，卡片回未收藏', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
+
+    const user = userEvent.setup()
+    const first = render(<App />)
+    await pickLocation()
+    await screen.findByText('羅東夜市小吃')
+    await user.click(screen.getByRole('button', { name: '收藏 羅東夜市小吃' }))
+    expect(screen.getByRole('button', { name: /收藏（1）/ })).toBeInTheDocument()
+
+    window.localStorage.clear()
+    first.unmount()
+    // 重新 mount 才會重新讀 localStorage。
+    render(<App />)
+    await screen.findByText('羅東夜市小吃')
+    expect(screen.queryByRole('button', { name: /收藏（1）/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '收藏 羅東夜市小吃' })).toBeInTheDocument()
+  })
+
+  it('換地點後收藏仍在', async () => {
+    api.fetchCategories.mockResolvedValue(sampleCategories)
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
+
+    const user = userEvent.setup()
+    render(<App />)
+    await pickLocation()
+    await screen.findByText('羅東夜市小吃')
+    await user.click(screen.getByRole('button', { name: '收藏 羅東夜市小吃' }))
+
+    const otherLocation = { lat: 25.03, lng: 121.56, label: '台北市信義區' }
+    api.fetchRestaurants.mockResolvedValueOnce(apiRestaurants(sampleRestaurants))
+    await pickLocation(otherLocation)
+
+    await screen.findByText('羅東夜市小吃')
+    expect(screen.getByRole('button', { name: /收藏（1）/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /取消收藏 羅東夜市小吃/ })).toBeInTheDocument()
+  })
 })

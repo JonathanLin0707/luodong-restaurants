@@ -198,6 +198,102 @@ body {
   background: #e3e9ff;
 }
 
+.radius-control {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.radius-control label {
+  font-weight: 600;
+}
+
+.radius-control input[type='range'] {
+  width: 220px;
+  accent-color: #3366ff;
+}
+
+.radius-value {
+  min-width: 3.5rem;
+  color: #3344aa;
+  font-variant-numeric: tabular-nums;
+}
+
+.restaurant-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.favorite-button,
+.favorite-map-link,
+.favorite-remove,
+.load-more-button,
+.favorites-toggle {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid #3366ff;
+  border-radius: 6px;
+  background: #fff;
+  color: #3366ff;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.favorite-button-active {
+  background: #fff7e0;
+  border-color: #d48806;
+  color: #ad4e00;
+}
+
+.load-more-button {
+  margin-top: 0.75rem;
+  width: 100%;
+}
+
+.favorites-panel {
+  margin: 1rem 0;
+  padding: 0.75rem;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.favorites-toggle {
+  width: 100%;
+  text-align: left;
+}
+
+.favorites-list {
+  list-style: none;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.favorite-item {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.favorite-info {
+  flex: 1 1 260px;
+  font-size: 0.9rem;
+}
+
+.favorite-info strong {
+  color: #1a1a1a;
+}
+
+.favorite-info span {
+  color: #666;
+}
+
 .layout {
   display: flex;
   flex-direction: column-reverse;
