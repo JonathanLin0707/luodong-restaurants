@@ -1,6 +1,13 @@
 import RestaurantCard from './RestaurantCard.jsx'
 
-export default function RestaurantList({ restaurants, selectedPlaceId, onSelect, onOpenMaps }) {
+export default function RestaurantList({
+  restaurants,
+  selectedPlaceId,
+  onSelect,
+  onOpenMaps,
+  favoriteIds,
+  onToggleFavorite,
+}) {
   return (
     <ul className="restaurant-list">
       {restaurants.map((restaurant) => (
@@ -10,6 +17,8 @@ export default function RestaurantList({ restaurants, selectedPlaceId, onSelect,
           isSelected={restaurant.placeId === selectedPlaceId}
           onSelect={onSelect}
           onOpenMaps={onOpenMaps}
+          isFavorite={favoriteIds.includes(restaurant.placeId)}
+          onToggleFavorite={onToggleFavorite}
         />
       ))}
     </ul>

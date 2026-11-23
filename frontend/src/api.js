@@ -8,7 +8,7 @@ async function handleResponse(res) {
   return res.json()
 }
 
-export async function fetchRestaurants({ category, sort, openNow, minRating, lat, lng, radius } = {}) {
+export async function fetchRestaurants({ category, sort, openNow, minRating, lat, lng, radius, pages } = {}) {
   const params = new URLSearchParams()
   if (category) params.set('category', category)
   if (sort) params.set('sort', sort)
@@ -17,6 +17,7 @@ export async function fetchRestaurants({ category, sort, openNow, minRating, lat
   if (lat != null) params.set('lat', lat)
   if (lng != null) params.set('lng', lng)
   if (radius != null) params.set('radius', radius)
+  if (pages != null) params.set('pages', pages)
   const query = params.toString()
   const res = await fetch(query ? `${RESTAURANTS_URL}?${query}` : RESTAURANTS_URL)
   return handleResponse(res)

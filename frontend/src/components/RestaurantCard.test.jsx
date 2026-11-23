@@ -124,4 +124,37 @@ describe('RestaurantCard - 互動', () => {
     await user.click(screen.getByRole('button', { name: /在 Google 地圖開啟/ }))
     expect(onOpenMaps).toHaveBeenCalled()
   })
+
+  it('收藏鈕點擊呼叫 onToggleFavorite，並帶入 restaurant', async () => {
+    const onToggleFavorite = vi.fn()
+    const user = userEvent.setup()
+    const restaurant = base()
+    render(
+      <RestaurantCard
+        restaurant={restaurant}
+        onSelect={vi.fn()}
+        onOpenMaps={vi.fn()}
+        onToggleFavorite={onToggleFavorite}
+      />,
+    )
+    const button = screen.getByRole('button', { name: /收藏 羅東夜市小吃/ })
+    expect(button).toHaveAttribute('aria-pressed', 'false')
+    await user.click(button)
+    expect(onToggleFavorite).toHaveBeenCalledWith(restaurant)
+  })
+
+  it('已收藏時 aria-pressed 為 true 且按鈕显示已收藏', () => {
+    render(
+      <RestaurantCard
+        restaurant={base()}
+        isFavorite
+        onSelect={vi.fn()}
+        onOpenMaps={vi.fn()}
+        onToggleFavorite={vi.fn()}
+      />,
+    )
+    const button = screen.getByRole('button', { name: /取消收藏 羅東夜市小吃/ })
+    expect(button).toHaveAttribute('aria-pressed', 'true')
+    expect(button).toHaveTextContent('已收藏')
+  })
 })
