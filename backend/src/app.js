@@ -168,18 +168,6 @@ function resolveOpenNow(rawOpenNow) {
   return value === '1' || value === 'true';
 }
 
-// priceLevel accepts 0..4, singly or as a comma-separated OR list. Like
-// category, it is a post-cache filter, so it never belongs in cacheKeyFor.
-function resolvePriceLevels(rawPriceLevel) {
-  const values = Array.isArray(rawPriceLevel) ? rawPriceLevel : [rawPriceLevel];
-  return values
-    .flatMap((value) => (typeof value === 'string' ? value.split(',') : []))
-    .map((value) => value.trim())
-    .filter((value) => value.length > 0)
-    .map((value) => Number(value))
-    .filter((value) => Number.isInteger(value) && value >= 0 && value <= 4);
-}
-
 function byDistanceThenRating(a, b) {
   const hasA = Number.isFinite(a.distanceMeters);
   const hasB = Number.isFinite(b.distanceMeters);
@@ -187,16 +175,6 @@ function byDistanceThenRating(a, b) {
     return a.distanceMeters - b.distanceMeters;
   }
   if (hasA !== hasB) return hasA ? -1 : 1;
-  const ratingA = Number.isFinite(a.rating) ? a.rating : -Infinity;
-  const ratingB = Number.isFinite(b.rating) ? b.rating : -Infinity;
-  if (ratingA !== ratingB) return ratingB - ratingA;
-  return String(a.placeId).localeCompare(String(b.placeId));
-}
-
-function byPopularityThenRating(a, b) {
-  const countA = Number.isFinite(a.userRatingsTotal) ? a.userRatingsTotal : -Infinity;
-  const countB = Number.isFinite(b.userRatingsTotal) ? b.userRatingsTotal : -Infinity;
-  if (countA !== countB) return countB - countA;
   const ratingA = Number.isFinite(a.rating) ? a.rating : -Infinity;
   const ratingB = Number.isFinite(b.rating) ? b.rating : -Infinity;
   if (ratingA !== ratingB) return ratingB - ratingA;
@@ -349,7 +327,6 @@ app.get('/api/restaurants', async (req, res) => {
   const pages = resolvePages(req.query.pages);
   const categories = resolveCategories(category);
   const minRating = resolveMinRating(req.query.minRating);
-  const priceLevels = resolvePriceLevels(req.query.priceLevel);
   const key = cacheKeyFor(lat, lng, radius, pages);
 
   let entry;
@@ -385,16 +362,10 @@ app.get('/api/restaurants', async (req, res) => {
   if (minRating !== null) {
     list = list.filter((r) => r.rating != null && r.rating >= minRating);
   }
-  if (priceLevels.length > 0) {
-    const wanted = new Set(priceLevels);
-    list = list.filter((r) => wanted.has(r.priceLevel));
-  }
   if (sort === 'rating') {
     list = [...list].sort((a, b) => (b.rating ?? -Infinity) - (a.rating ?? -Infinity));
   } else if (sort === 'distance') {
     list = [...list].sort(byDistanceThenRating);
-  } else if (sort === 'popular') {
-    list = [...list].sort(byPopularityThenRating);
   }
 
   const maxItems = pages * MAX_PLACES_PER_PAGE;

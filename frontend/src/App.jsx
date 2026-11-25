@@ -57,9 +57,8 @@ export default function App() {
       sort,
       openNow,
       minRating,
-      priceLevel,
     })
-  }, [location, radius, selectedCategory, sort, openNow, minRating, priceLevel])
+  }, [location, radius, selectedCategory, sort, openNow, minRating])
 
   const loadRestaurants = useCallback(async () => {
     if (!location) return
@@ -122,7 +121,7 @@ export default function App() {
   useEffect(() => {
     setPages(1)
     setCandidatePlaceIds(null)
-  }, [location, radius, selectedCategory, sort, openNow, minRating, priceLevel])
+  }, [location, radius, selectedCategory, sort, openNow, minRating])
 
   const displayedRestaurants = useMemo(() => {
     if (!candidatePlaceIds) return restaurants
@@ -171,7 +170,6 @@ export default function App() {
   const handleClearFilters = useCallback(() => {
     setSelectedCategory('')
     setMinRating(0)
-    setPriceLevel('')
     setOpenNow(false)
   }, [])
 
@@ -215,8 +213,6 @@ export default function App() {
             onChange={setSort}
             minRating={minRating}
             onMinRatingChange={setMinRating}
-            priceLevel={priceLevel}
-            onPriceLevelChange={setPriceLevel}
           />
           <label className='open-now-control'>
             <input

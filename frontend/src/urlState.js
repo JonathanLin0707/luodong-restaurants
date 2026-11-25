@@ -8,17 +8,12 @@ export const MAX_RADIUS_METERS = 10000
 
 export const SORT_RATING = 'rating'
 export const SORT_DISTANCE = 'distance'
-export const SORT_POPULAR = 'popular'
 
 // 本頁會寫回網址的參數；其他參數（例如 utm_source）原樣保留，不隨條件變更被清掉。
-export const APP_QUERY_KEYS = ['lat', 'lng', 'radius', 'category', 'sort', 'openNow', 'minRating', 'priceLevel']
+export const APP_QUERY_KEYS = ['lat', 'lng', 'radius', 'category', 'sort', 'openNow', 'minRating']
 
 // 最低評分選項；0 代表不限。與後端 resolveMinRating 的合法值一致（0 < 值 <= 5），前端只產生這四個值。
 export const MIN_RATING_OPTIONS = [0, 3.5, 4, 4.5]
-
-// 價位沿用 Google Places 的 0..4：0 是免費，1–4 依序為便宜到非常昂貴。
-// 「不限」用空字串表示，才不會把免費和不限混在一起。
-export const PRICE_LEVEL_OPTIONS = [0, 1, 2, 3, 4]
 
 // 行政區中心點比對容錯（度）。0.001 度約 110 公尺，遠小於相鄰鄉鎮市區的距離，
 // 又足以吸收「座標寫進網址時四捨五入到小數 5 位」造成的誤差。
@@ -45,15 +40,6 @@ export function resolveMinRating(rawMinRating) {
   if (rawMinRating === null || rawMinRating === undefined) return 0
   const value = Number(String(rawMinRating).trim())
   return MIN_RATING_OPTIONS.includes(value) ? value : 0
-}
-
-// 與後端 resolvePriceLevels 一致：只認 0..4 的整數（0 是免費）；空值或亂填代表不限。
-export function resolvePriceLevel(rawPriceLevel) {
-  if (rawPriceLevel === null || rawPriceLevel === undefined) return ''
-  const text = String(rawPriceLevel).trim()
-  if (!text) return ''
-  const value = Number(text)
-  return PRICE_LEVEL_OPTIONS.includes(value) ? value : ''
 }
 
 // 半徑規則刻意與後端 resolveRadius 一致：不是有限數字、或超出 100–10000，就回預設 1000。
@@ -94,10 +80,9 @@ export function parseAppUrl(search) {
   const districtLabel = hasLocation ? districtLabelForCoordinates(lat, lng) : ''
   const category = hasLocation ? (params.get('category') || '').trim() : ''
   const rawSort = hasLocation ? (params.get('sort') || '').trim() : ''
-  const sort = rawSort === SORT_RATING || rawSort === SORT_DISTANCE || rawSort === SORT_POPULAR ? rawSort : ''
+  const sort = rawSort === SORT_RATING || rawSort === SORT_DISTANCE ? rawSort : ''
   const openNow = hasLocation && (params.get('openNow') === '1' || String(params.get('openNow') || '').toLowerCase() === 'true')
   const minRating = hasLocation ? resolveMinRating(params.get('minRating')) : 0
-  const priceLevel = hasLocation ? resolvePriceLevel(params.get('priceLevel')) : ''
 
   return {
     location: hasLocation
@@ -110,12 +95,11 @@ export function parseAppUrl(search) {
     sort,
     openNow,
     minRating,
-    priceLevel,
   }
 }
 
 // 把畫面狀態轉成網址參數。預設值不寫進網址：半徑 1000、全部分類、不排序。
-export function toAppUrlParams({ location, radius, category, sort, openNow, minRating, priceLevel } = {}) {
+export function toAppUrlParams({ location, radius, category, sort, openNow, minRating } = {}) {
   const params = new URLSearchParams()
   if (!location || !Number.isFinite(location.lat) || !Number.isFinite(location.lng)) return params
 
@@ -130,14 +114,10 @@ export function toAppUrlParams({ location, radius, category, sort, openNow, minR
 
   if (sort === SORT_RATING) params.set('sort', SORT_RATING)
   if (sort === SORT_DISTANCE) params.set('sort', SORT_DISTANCE)
-  if (sort === SORT_POPULAR) params.set('sort', SORT_POPULAR)
   if (openNow) params.set('openNow', '1')
 
   const resolvedMinRating = resolveMinRating(minRating)
   if (resolvedMinRating > 0) params.set('minRating', String(resolvedMinRating))
-
-  const resolvedPriceLevel = resolvePriceLevel(priceLevel)
-  if (resolvedPriceLevel !== '') params.set('priceLevel', String(resolvedPriceLevel))
 
   return params
 }
