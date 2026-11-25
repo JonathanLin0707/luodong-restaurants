@@ -14,6 +14,7 @@ export async function fetchRestaurants({ category, sort, openNow, minRating, lat
   if (sort) params.set('sort', sort)
   if (openNow) params.set('openNow', '1')
   if (minRating) params.set('minRating', minRating)
+  if (priceLevel !== '' && priceLevel != null) params.set('priceLevel', priceLevel)
   if (lat != null) params.set('lat', lat)
   if (lng != null) params.set('lng', lng)
   if (radius != null) params.set('radius', radius)
