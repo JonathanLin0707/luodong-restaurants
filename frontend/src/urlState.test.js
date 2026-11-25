@@ -30,6 +30,7 @@ describe('urlState - 讀取網址', () => {
       sort: '',
       openNow: false,
       minRating: 0,
+      priceLevel: '',
     })
   })
 
@@ -229,5 +230,58 @@ describe('urlState - 最低評分（新）', () => {
     expect(toAppUrlParams({ location: loc, minRating: 4 }).get('minRating')).toBe('4')
     const search = '?' + toAppUrlParams({ location: loc, minRating: 3.5 })
     expect(parseAppUrl(search).minRating).toBe(3.5)
+  })
+})
+
+describe('urlState - 價位篩選與人氣排序', () => {
+  const LOC = '?lat=24.6778&lng=121.7684'
+
+  it.each([
+    ['0', 0],
+    ['1', 1],
+    ['2', 2],
+    ['3', 3],
+    ['4', 4],
+  ])('priceLevel=%s 會被還原成 %s', (raw, expected) => {
+    expect(parseAppUrl(`${LOC}&priceLevel=${raw}`).priceLevel).toBe(expected)
+  })
+
+  it.each(['abc', '5', '-1', '2.5'])('不合法的 priceLevel %s 當成不限', (raw) => {
+    expect(parseAppUrl(`${LOC}&priceLevel=${raw}`).priceLevel).toBe('')
+  })
+
+  it('priceLevel 空白也是不限', () => {
+    expect(parseAppUrl(`${LOC}&priceLevel=`).priceLevel).toBe('')
+  })
+
+  it('沒有地點時 priceLevel 一併忽略', () => {
+    expect(parseAppUrl('?priceLevel=3').priceLevel).toBe('')
+  })
+
+  it('不限不寫入網址，0（免費）與 1–4 都會寫入，來回讀寫不變', () => {
+    const loc = { lat: 24.6778, lng: 121.7684 }
+    expect(toAppUrlParams({ location: loc, priceLevel: '' }).get('priceLevel')).toBeNull()
+    expect(toAppUrlParams({ location: loc, priceLevel: 0 }).get('priceLevel')).toBe('0')
+    expect(toAppUrlParams({ location: loc, priceLevel: 2 }).get('priceLevel')).toBe('2')
+    expect(parseAppUrl('?' + toAppUrlParams({ location: loc, priceLevel: 0 })).priceLevel).toBe(0)
+    const search = '?' + toAppUrlParams({ location: loc, priceLevel: 4 })
+    expect(parseAppUrl(search).priceLevel).toBe(4)
+  })
+
+  it('sort=popular 會被解析與寫回，未知排序降級為空字串', () => {
+    expect(parseAppUrl(`${LOC}&sort=popular`).sort).toBe('popular')
+    expect(parseAppUrl(`${LOC}&sort=popularity`).sort).toBe('')
+    const params = toAppUrlParams({ location: { lat: 24.6778, lng: 121.7684 }, sort: 'popular' })
+    expect(params.get('sort')).toBe('popular')
+    expect(parseAppUrl(`?${params}`).sort).toBe('popular')
+  })
+
+  it('syncAppUrl 換掉舊的價位與排序參數', () => {
+    window.history.replaceState(null, '', '/?lat=24.6&lng=121.7&priceLevel=3&sort=popular&utm_source=line')
+    syncAppUrl({ location: { lat: 24.6778, lng: 121.7684 }, priceLevel: '', sort: '' })
+    const params = new URLSearchParams(window.location.search)
+    expect(params.get('priceLevel')).toBeNull()
+    expect(params.get('sort')).toBeNull()
+    expect(params.get('utm_source')).toBe('line')
   })
 })

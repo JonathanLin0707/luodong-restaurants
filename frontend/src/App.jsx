@@ -31,6 +31,7 @@ export default function App() {
   const [sort, setSort] = useState(initialUrlState.sort || '')
   const [openNow, setOpenNow] = useState(Boolean(initialUrlState.openNow))
   const [minRating, setMinRating] = useState(initialUrlState.minRating)
+  const [priceLevel, setPriceLevel] = useState(initialUrlState.priceLevel)
   // 半徑目前跟著網址走（預設 1000）；下一批接上半徑調整滑桿時直接從這裡改。
   const [radius] = useState(initialUrlState.radius)
   const [status, setStatus] = useState('idle') // idle | loading | ready | error
@@ -51,8 +52,9 @@ export default function App() {
       sort,
       openNow,
       minRating,
+      priceLevel,
     })
-  }, [location, radius, selectedCategory, sort, openNow, minRating])
+  }, [location, radius, selectedCategory, sort, openNow, minRating, priceLevel])
 
   const loadRestaurants = useCallback(async () => {
     if (!location) return
@@ -74,6 +76,8 @@ export default function App() {
         lat: location.lat,
         lng: location.lng,
         radius,
+        // 只有真的在篩價位時才送；0 是免費，不能被當成 falsy 丟掉。
+        ...(priceLevel !== '' ? { priceLevel } : {}),
       })
       if (gen !== genRef.current) return
       const list = Array.isArray(data?.restaurants) ? data.restaurants : []
@@ -102,7 +106,7 @@ export default function App() {
       setStatus('error')
       statusRef.current = 'error'
     }
-  }, [location, radius, selectedCategory, sort, openNow, minRating])
+  }, [location, radius, selectedCategory, sort, openNow, minRating, priceLevel])
 
   useEffect(() => {
     loadRestaurants()
@@ -112,7 +116,7 @@ export default function App() {
 
   useEffect(() => {
     setCandidatePlaceIds(null)
-  }, [location, radius, selectedCategory, sort, openNow, minRating])
+  }, [location, radius, selectedCategory, sort, openNow, minRating, priceLevel])
 
   const displayedRestaurants = useMemo(() => {
     if (!candidatePlaceIds) return restaurants
@@ -130,11 +134,12 @@ export default function App() {
     setSelectedCategory('')
   }, [])
 
-  // 清除篩選只回到預設分類、最低評分與營業中；排序與地點保留，避免一按就丟掉使用者選的地點。
-  const hasActiveFilters = Boolean(selectedCategory || minRating || openNow)
+  // 清除篩選只回到預設分類、最低評分、價位與營業中；排序與地點保留，避免一按就丟掉使用者選的地點。
+  const hasActiveFilters = Boolean(selectedCategory || minRating || openNow) || priceLevel !== ''
   const handleClearFilters = useCallback(() => {
     setSelectedCategory('')
     setMinRating(0)
+    setPriceLevel('')
     setOpenNow(false)
   }, [])
 
@@ -177,6 +182,8 @@ export default function App() {
             onChange={setSort}
             minRating={minRating}
             onMinRatingChange={setMinRating}
+            priceLevel={priceLevel}
+            onPriceLevelChange={setPriceLevel}
           />
           <label className='open-now-control'>
             <input

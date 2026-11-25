@@ -1559,3 +1559,86 @@ describe('App - Render 休眠喚醒提示', () => {
     expect(screen.queryByText('正在喚醒伺服器，通常需要十幾秒到幾十秒，請稍候…')).not.toBeInTheDocument()
   }, 8000)
 })
+
+describe('App - 價位篩選與人氣排序', () => {
+  it('選價位 2 會帶 priceLevel=2 查詢並寫進網址', async () => {
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
+    const user = userEvent.setup()
+    render(<App />)
+    await pickLocation()
+    await screen.findByText('羅東夜市小吃')
+
+    await user.selectOptions(screen.getByLabelText('價位'), '2')
+    await waitFor(() =>
+      expect(api.fetchRestaurants).toHaveBeenLastCalledWith(
+        expect.objectContaining({ priceLevel: 2 }),
+      ),
+    )
+    expect(urlParams().get('priceLevel')).toBe('2')
+  })
+
+  it('選人氣排序會帶 sort=popular 查詢並寫進網址', async () => {
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
+    const user = userEvent.setup()
+    render(<App />)
+    await pickLocation()
+    await screen.findByText('羅東夜市小吃')
+
+    await user.selectOptions(screen.getByLabelText('排序'), 'popular')
+    await waitFor(() =>
+      expect(api.fetchRestaurants).toHaveBeenLastCalledWith(
+        expect.objectContaining({ sort: 'popular' }),
+      ),
+    )
+    expect(urlParams().get('sort')).toBe('popular')
+  })
+
+  it('分享連結帶 priceLevel=3 與 sort=popular 時一開啟就套用', async () => {
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
+    setUrl(`lat=${DEFAULT_LOCATION.lat}&lng=${DEFAULT_LOCATION.lng}&priceLevel=3&sort=popular`)
+    render(<App />)
+
+    await waitFor(() =>
+      expect(api.fetchRestaurants).toHaveBeenCalledWith(
+        expect.objectContaining({ priceLevel: 3, sort: 'popular' }),
+      ),
+    )
+    expect(screen.getByLabelText('價位')).toHaveValue('3')
+    expect(screen.getByLabelText('排序')).toHaveValue('popular')
+  })
+
+  it('清除篩選會重置價位但保留人氣排序', async () => {
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
+    const user = userEvent.setup()
+    render(<App />)
+    await pickLocation()
+    await screen.findByText('羅東夜市小吃')
+
+    await user.selectOptions(screen.getByLabelText('價位'), '4')
+    await user.selectOptions(screen.getByLabelText('排序'), 'popular')
+    await waitFor(() => expect(urlParams().get('priceLevel')).toBe('4'))
+    await user.click(screen.getByRole('button', { name: '清除篩選' }))
+
+    expect(screen.getByLabelText('價位')).toHaveValue('')
+    expect(screen.getByLabelText('排序')).toHaveValue('popular')
+    expect(urlParams().get('priceLevel')).toBeNull()
+    expect(urlParams().get('sort')).toBe('popular')
+  })
+
+  it('選「免費」會送出 priceLevel=0，不會被當成不限而漏掉', async () => {
+    api.fetchRestaurants.mockResolvedValue(apiRestaurants(sampleRestaurants))
+    const user = userEvent.setup()
+    render(<App />)
+    await pickLocation()
+    await screen.findByText('羅東夜市小吃')
+
+    await user.selectOptions(screen.getByLabelText('價位'), '0')
+
+    await waitFor(() =>
+      expect(api.fetchRestaurants).toHaveBeenLastCalledWith(
+        expect.objectContaining({ priceLevel: 0 }),
+      ),
+    )
+    expect(urlParams().get('priceLevel')).toBe('0')
+  })
+})
