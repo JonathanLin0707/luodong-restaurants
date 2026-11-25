@@ -8,7 +8,7 @@ async function handleResponse(res) {
   return res.json()
 }
 
-export async function fetchRestaurants({ category, sort, openNow, minRating, lat, lng, radius, pages } = {}) {
+export async function fetchRestaurants({ category, sort, openNow, minRating, priceLevel, lat, lng, radius, pages } = {}) {
   const params = new URLSearchParams()
   if (category) params.set('category', category)
   if (sort) params.set('sort', sort)

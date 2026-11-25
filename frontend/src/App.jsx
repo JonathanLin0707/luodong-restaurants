@@ -34,6 +34,7 @@ export default function App() {
   const [sort, setSort] = useState(initialUrlState.sort || '')
   const [openNow, setOpenNow] = useState(Boolean(initialUrlState.openNow))
   const [minRating, setMinRating] = useState(initialUrlState.minRating)
+  const [priceLevel, setPriceLevel] = useState(initialUrlState.priceLevel)
   const [radius, setRadius] = useState(initialUrlState.radius)
   // 「載入更多」用頁數累加重新查，每次取代清單；上限 3 頁。
   const [pages, setPages] = useState(1)
@@ -78,6 +79,8 @@ export default function App() {
         sort: sort || undefined,
         openNow: openNow ? true : undefined,
         minRating: minRating || undefined,
+        // 只有真的在篩價位時才送；0 是免費，不能被當成 falsy 丟掉。
+        ...(priceLevel !== '' ? { priceLevel } : {}),
         lat: location.lat,
         lng: location.lng,
         radius,
@@ -110,7 +113,7 @@ export default function App() {
       setStatus('error')
       statusRef.current = 'error'
     }
-  }, [location, radius, selectedCategory, sort, openNow, minRating, pages])
+  }, [location, radius, selectedCategory, sort, openNow, minRating, priceLevel, pages])
 
   useEffect(() => {
     loadRestaurants()
@@ -167,7 +170,7 @@ export default function App() {
   }, [pages])
 
   // 清除篩選只回到預設分類、最低評分與營業中；排序與地點保留，避免一按就丟掉使用者選的地點。
-  const hasActiveFilters = Boolean(selectedCategory || minRating || openNow)
+  const hasActiveFilters = Boolean(selectedCategory || minRating || openNow || priceLevel !== '')
   const handleClearFilters = useCallback(() => {
     setSelectedCategory('')
     setMinRating(0)
