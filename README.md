@@ -1,6 +1,6 @@
 # 附近餐廳推薦系統
 
-依使用者選定的地點（地址搜尋或目前位置），抓取附近 Google Maps 上的餐廳星數與資訊，提供地圖顯示、分類篩選、依星數排序、抽 5 家候選、點擊直連 Google 地圖。
+依使用者選定的地點（本地鄉鎮市區搜尋、選用的 Google 地址搜尋或目前位置），抓取附近 Google Maps 上的餐廳星數與資訊，提供地圖顯示、分類／最低評分／價位篩選、依星數／距離／人氣（評論數）排序、只看營業中、搜尋半徑調整、載入更多（最多 3 頁 60 筆）、收藏、抽 5 家候選、點擊直連 Google 地圖。評分低於 3.0 的店家不顯示。
 
 ## 架構
 
@@ -49,16 +49,16 @@ FRONTEND_ORIGIN=http://localhost:5173
 
 ### API
 
-每個端點都要帶地點座標；`lat`/`lng` 必填，`radius` 選填（公尺，預設 `1000`）。同一個地點（依 `lat`/`lng`/`radius` 組成快取鍵）24 小時內會直接用快取，超過才會重新呼叫 Google Places API。
+每個端點都要帶地點座標；`lat`/`lng` 必填，`radius` 選填（公尺，範圍 `100`～`10000`，預設 `1000`；超出範圍或不是數字時用預設值）。同一個地點（依 `lat`/`lng`/`radius`，以及 `pages` 大於 1 時的頁數組成快取鍵）24 小時內會直接用快取，超過才會重新呼叫 Google Places API。
 
 | Method | Path | 說明 |
 |---|---|---|
 | GET | `/api/health` | 健康檢查 |
-| GET | `/api/restaurants?lat=<number>&lng=<number>&radius=<meters>&category=<string>&sort=rating|distance&openNow=1` | 該地點附近的餐廳清單（可用 category 篩選；sort=rating 依星數高到低、sort=distance 依距離由近到遠；openNow=1 只看營業中） |
+| GET | `/api/restaurants?lat=<number>&lng=<number>&radius=<meters>&pages=1-3&category=<string>&minRating=<number>&priceLevel=0-4&sort=rating|distance|popular&openNow=1` | 該地點附近的餐廳清單。`pages`：抓幾頁（每頁最多 20 筆，上限 3 頁）；`category`、`priceLevel` 可用逗號帶多個值（任一符合即可，`priceLevel` 0＝免費、1～4＝便宜到很貴）；`minRating`：最低星數；`sort=rating` 依星數高到低、`sort=distance` 依距離由近到遠、`sort=popular` 依評論數多到少（同數再比星數）；`openNow=1` 只看營業中。篩選與排序都在快取之後做，不會多打 Google API |
 | GET | `/api/categories?lat=<number>&lng=<number>&radius=<meters>` | 該地點快取中出現過的分類清單 |
 | POST | `/api/restaurants/refresh?lat=<number>&lng=<number>&radius=<meters>` | 強制重新呼叫 Google Places API 更新該地點的快取，**會產生 Google API 費用，請手動觸發，不要排程頻繁呼叫** |
 
-資料抓取範圍：以指定座標為圓心、依 `radius` 做一次 Nearby Search（最多 20 筆結果）。分類是先比對店名關鍵字，比對不到再用 Google 回傳的 `types` 欄位輔助判斷，兩者都沒命中才歸類「其他」——這是啟發式規則，不保證 100% 準確。
+資料抓取範圍：以指定座標為圓心、依 `radius` 做 Nearby Search，每頁最多 20 筆，依 `pages` 最多接著抓到第 3 頁（Google 沒有下一頁時就停）。分類是先比對店名關鍵字，比對不到再用 Google 回傳的 `types` 欄位輔助判斷，兩者都沒命中才歸類「其他」——這是啟發式規則，不保證 100% 準確。
 
 ## 前端
 
@@ -84,6 +84,9 @@ VITE_GOOGLE_MAPS_API_KEY=你的金鑰
 2. 開啟 `http://localhost:5173`，先在「地點」欄位輸入縣市或鄉鎮市區（例如「羅東」「信義」），從下拉選單選一個，或點「使用目前位置」；也可以展開「用地址或地標搜尋（Google，選用）」用 Google 搜尋地址或地標。
 3. 選定地點後，前端才會帶該地點的 `lat`/`lng` 呼叫後端，後端若該地點快取已過期（超過 24 小時）或是第一次查詢，會即時呼叫 Google Places API 抓資料並快取；地圖與清單才會顯示該地點附近的餐廳資料。
 4. 換一個地點會重新走一次上述流程；原本選擇的分類若新地點沒有，會自動重置為「全部分類」。
+5. 清單上方可以調整「搜尋半徑」、分類、價位與排序（含「依人氣（評論數多到少）」）；查詢條件會同步到網址，重新整理或分享連結會保留。改任何條件都會回到第 1 頁。
+6. 清單底部的「載入更多」會多抓一頁，最多到第 3 頁。
+7. 每張卡片可以「☆ 收藏」，收藏存在瀏覽器的 localStorage（存店名、星數、評論數、地址、分類、價位與地圖連結，不存距離與營業狀態這類會變的資料），重新整理後仍在。
 
 ## 部署到 Render（單一服務）
 
