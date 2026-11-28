@@ -30,9 +30,10 @@ cd frontend && npm install && npm test && npm run build
 - 2026-11-27 Jonathan 在 Render 正式網址用真實 Google 資料實測價位篩選與「人氣」排序，回報完成無問題，此項結案。
 - README 已於 2026-11-27 補上半徑、載入更多、收藏、價位篩選、人氣排序與 API 參數說明。
 
-- 2026-11-28 PWA（可安裝）在分支 `feature/pwa-install` 實作中（Atlas 審、Ada 簽核規格），未合併 main、未上線；待 Rigel QA。內容：manifest、圖示、手寫 `sw.js`（只快取離線頁／assets／圖示，不碰 `/api` 與外部網域）、「安裝成 App」按鈕、後端 static 標頭與副檔名 404。PWA 出事時的回退：部署「自我 unregister＋清快取」的 `sw.js`（README「回退預案」），不能只刪檔。
+- 2026-11-28 PWA（可安裝）已合併 main（`ec348e6`，Atlas 審、Ada 簽核、Rigel 獨立 QA 本機項目全 PASS：後端 107/107、前端 183/183）。待 Jonathan 在 Render 正式網址用手機（Android／iPhone）實測安裝。內容：manifest、圖示、手寫 `sw.js`（只快取離線頁／assets／圖示，不碰 `/api` 與外部網域）、「安裝成 App」按鈕、後端 static 標頭與副檔名 404。PWA 出事時的回退：部署「自我 unregister＋清快取」的 `sw.js`（README「回退預案」），不能只刪檔。
 
 ## 還沒做完的事
+- PWA 尚未在 Render 正式網址與真機（Android 安裝按鈕、iPhone 加入主畫面）實測，等 Jonathan 回覆。
 - 前端偶發 1 筆測試失敗（出現過兩次、無法重現），列間歇性待觀察。
 ## 所有專案共用規則（開工前必讀）
 
