@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- 附近餐廳推薦圖示：藍底＋白色定位點，定位點裡是叉子與湯匙。PNG 由這份圖形產生。 -->
+  <rect width="512" height="512" fill="#3366ff"/>
+  <path d="M256 72c-79.5 0-144 64.5-144 144 0 108 144 224 144 224s144-116 144-224c0-79.5-64.5-144-144-144z" fill="#ffffff"/>
+  <circle cx="256" cy="216" r="92" fill="#3366ff"/>
+  <!-- 叉子 -->
+  <rect x="206" y="160" width="10" height="44" rx="5" fill="#ffffff"/>
+  <rect x="222" y="160" width="10" height="44" rx="5" fill="#ffffff"/>
+  <rect x="238" y="160" width="10" height="44" rx="5" fill="#ffffff"/>
+  <rect x="206" y="196" width="42" height="16" rx="8" fill="#ffffff"/>
+  <rect x="219" y="204" width="16" height="72" rx="8" fill="#ffffff"/>
+  <!-- 湯匙 -->
+  <ellipse cx="292" cy="186" rx="20" ry="28" fill="#ffffff"/>
+  <rect x="284" y="204" width="16" height="72" rx="8" fill="#ffffff"/>
+</svg>

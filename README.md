@@ -88,6 +88,38 @@ VITE_GOOGLE_MAPS_API_KEY=你的金鑰
 6. 清單底部的「載入更多」會多抓一頁，最多到第 3 頁。
 7. 每張卡片可以「☆ 收藏」，收藏存在瀏覽器的 localStorage（存店名、星數、評論數、地址、分類、價位與地圖連結，不存距離與營業狀態這類會變的資料），重新整理後仍在。
 
+## 安裝成 App（PWA）
+
+網站可以像 App 一樣裝到手機主畫面或電腦（需 https，Render 正式網址符合；本機 `localhost` 也可以）。
+
+- **Android / 桌機 Chrome、Edge**：頁首出現「安裝成 App」按鈕時點它；或用網址列右側的安裝圖示、選單裡的「安裝應用程式／加到主畫面」。已安裝或瀏覽器不支援時，按鈕不會出現。
+- **iPhone / iPad（Safari）**：iOS 不支援安裝按鈕，請點 Safari 的「分享」→「加入主畫面」。
+
+說明：
+- 只快取離線頁（`/offline.html`）、帶 hash 的 `/assets/*`、圖示與 manifest；`/api/*` 與 Google Maps 等外部請求一律不快取，餐廳資料永遠是最新的。斷網時開啟會看到「目前沒有網路，連線後才能查附近餐廳。」頁面。
+- `frontend/public/sw.js` 裡的 `__SW_VERSION__` 在 `npm run build` 時自動換成 `RENDER_GIT_COMMIT`（本機為建置時間），每次部署都會清掉舊快取；不要手改。開發模式（`npm run dev`）與測試不註冊 service worker。
+- 後端對 `/sw.js`、`/manifest.webmanifest` 送 `Cache-Control: no-cache`，`/assets/*` 送一年 immutable；帶副檔名但不存在的路徑（例如 `/not-exist.png`）回 404，不回首頁。
+- 圖示原始檔：`frontend/public/icons/icon.svg`、`icon-maskable.svg`；PNG 已產生好放在同資料夾（192、512、512 maskable、180 apple-touch-icon），不需要額外轉換工具。
+
+### 回退預案（PWA 出問題時）
+
+**不能只刪掉 `sw.js`**：已安裝的 service worker 會繼續控制使用者的頁面。要部署一個「自我解除」版本的 `frontend/public/sw.js` 取代它：
+
+```js
+self.addEventListener('install', () => self.skipWaiting())
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys()
+      .then((keys) => Promise.all(keys.map((key) => caches.delete(key))))
+      .then(() => self.registration.unregister())
+      .then(() => self.clients.matchAll())
+      .then((clients) => clients.forEach((client) => client.navigate(client.url))),
+  )
+})
+```
+
+部署後使用者下次開網站就會清掉快取並解除註冊。之後可另外移除 `main.jsx` 裡的 `registerServiceWorker()`。
+
 ## 部署到 Render（單一服務）
 
 這個專案改成「單一 Node 服務」部署：後端 Express 在所有 `/api` 路由之後，也會把前端 build 出來的 `frontend/dist` 當成靜態檔案服務（非 `/api` 的路徑一律回 `index.html`，讓前端的路由自己接手；未知的 `/api/*` 路徑則回 JSON 404）。本機開發時 `frontend/dist` 通常不存在，後端會自動跳過靜態服務，不影響 Vite 5173 + 後端 3002 的 proxy 開發模式。

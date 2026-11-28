@@ -18,6 +18,42 @@ body {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
+.app-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+}
+
+.app-header h1 {
+  margin: 0;
+  flex: 1 1 14rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.install-app-button {
+  flex: 0 0 auto;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid #3366ff;
+  border-radius: 6px;
+  background: #3366ff;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.install-app-button:hover {
+  background: #2952cc;
+  border-color: #2952cc;
+}
+
+.install-app-button:focus-visible {
+  outline: 3px solid #1a1a1a;
+  outline-offset: 2px;
+}
+
 .location-picker {
   margin: 1rem 0;
 }

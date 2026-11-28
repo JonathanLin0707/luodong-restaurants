@@ -5,6 +5,7 @@ import CategoryFilter from './components/CategoryFilter.jsx'
 import SortControl from './components/SortControl.jsx'
 import LocationPicker from './components/LocationPicker.jsx'
 import RadiusControl from './components/RadiusControl.jsx'
+import InstallButton from './components/InstallButton.jsx'
 import { fetchRestaurants } from './api.js'
 import { parseAppUrl, syncAppUrl } from './urlState.js'
 import { loadFavorites, removeFavorite, saveFavorites, toggleFavorite } from './favorites.js'
@@ -199,7 +200,10 @@ export default function App() {
 
   return (
     <main className="app">
-      <h1>附近餐廳推薦{location ? `：${location.label}` : ''}</h1>
+      <header className="app-header">
+        <h1>附近餐廳推薦{location ? `：${location.label}` : ''}</h1>
+        <InstallButton />
+      </header>
 
       <LocationPicker
         onLocationChange={handleLocationChange}

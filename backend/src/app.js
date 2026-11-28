@@ -462,8 +462,23 @@ app.SCHEMA_VERSION = SCHEMA_VERSION;
 
 // Serves the built frontend (frontend/dist) if present; in dev the frontend
 // runs separately on Vite (5173), so a missing dist just means we skip this.
+// PWA 相關標頭：sw.js 與 manifest 每次都要回伺服器確認（避免使用者卡在舊版），
+// Vite 帶 hash 的 /assets/* 內容不會變，可以長期快取。
+const NO_CACHE_FILES = new Set(['sw.js', 'manifest.webmanifest']);
+function setStaticHeaders(res, filePath) {
+  const relative = path.relative(FRONTEND_DIST_DIR, filePath).split(path.sep).join('/');
+  if (NO_CACHE_FILES.has(relative)) {
+    res.setHeader('Cache-Control', 'no-cache');
+  } else if (relative.startsWith('assets/')) {
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+  }
+  if (relative === 'manifest.webmanifest') {
+    res.setHeader('Content-Type', 'application/manifest+json; charset=utf-8');
+  }
+}
+
 if (fs.existsSync(FRONTEND_DIST_DIR)) {
-  app.use(express.static(FRONTEND_DIST_DIR));
+  app.use(express.static(FRONTEND_DIST_DIR, { setHeaders: setStaticHeaders }));
 }
 
 app.use('/api', (req, res) => {
@@ -471,6 +486,11 @@ app.use('/api', (req, res) => {
 });
 
 app.get('*', (req, res, next) => {
+  // 帶副檔名的路徑（例如 /not-exist.png、/old-sw.js）找不到就是 404，
+  // 不回 index.html，免得瀏覽器或 service worker 把 HTML 當成圖片或腳本。
+  if (path.extname(req.path)) {
+    return res.status(404).type('text/plain').send('Not found');
+  }
   if (fs.existsSync(FRONTEND_INDEX_HTML)) {
     return res.sendFile(FRONTEND_INDEX_HTML);
   }

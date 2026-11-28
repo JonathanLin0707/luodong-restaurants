@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#3366ff" />
+    <title>目前離線｜附近餐廳推薦</title>
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f7f7f8;
+        color: #1a1a1a;
+        font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+      }
+      main {
+        max-width: 22rem;
+        margin: 1rem;
+        padding: 1.5rem;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+        text-align: center;
+      }
+      h1 { font-size: 1.25rem; margin: 0 0 0.75rem; }
+      p { margin: 0 0 1.25rem; line-height: 1.6; }
+      button {
+        padding: 0.5rem 1.2rem;
+        border: 1px solid #3366ff;
+        border-radius: 6px;
+        background: #3366ff;
+        color: #fff;
+        font-size: 1rem;
+        cursor: pointer;
+      }
+      button:focus-visible { outline: 3px solid #1a1a1a; outline-offset: 2px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>附近餐廳推薦</h1>
+      <p>目前沒有網路，連線後才能查附近餐廳。</p>
+      <button type="button" onclick="location.reload()">重新整理</button>
+    </main>
+  </body>
+</html>
